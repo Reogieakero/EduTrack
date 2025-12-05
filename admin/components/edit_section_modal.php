@@ -44,7 +44,11 @@
                     <button type="submit" id="updateSectionBtn" class="w-full sm:w-auto bg-primary-green hover:bg-green-700 text-white font-semibold py-2.5 px-6 rounded-lg transition duration-150 shadow-md flex items-center justify-center space-x-2">
                         <i data-lucide="check" class="w-5 h-5" id="updateIcon"></i>
                         <span id="updateText">Update Section</span>
-                        </button>
+                        <svg id="updateLoadingSpinner" class="animate-spin h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3.0 7.961l3.0-2.67z"></path>
+                        </svg>
+                    </button>
                 </div>
             </form>
         </div>

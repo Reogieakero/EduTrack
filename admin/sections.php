@@ -6,6 +6,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     exit;
 }
 
+// NOTE: Ensure your database connection file is correctly configured and placed.
 require_once '../config/database.php';
 
 $add_success_details = null;
@@ -14,13 +15,33 @@ if (isset($_SESSION['add_success_details'])) {
     unset($_SESSION['add_success_details']); 
 } 
 
-// --- NEW EDIT DATA STORAGE ---
+// --- EDIT DATA STORAGE ---
 $section_to_edit = null;
 if (isset($_SESSION['section_to_edit'])) {
     $section_to_edit = $_SESSION['section_to_edit'];
     unset($_SESSION['section_to_edit']);
 }
-// --- END NEW EDIT DATA STORAGE ---
+
+// --- Session variable for successful UPDATE details ---
+$edit_success_details = null; 
+if (isset($_SESSION['edit_success_details'])) {
+    $edit_success_details = $_SESSION['edit_success_details'];
+    unset($_SESSION['edit_success_details']);
+}
+// --- Session variable for successful DELETE details ---
+$delete_success_details = null; 
+if (isset($_SESSION['delete_success_details'])) {
+    $delete_success_details = $_SESSION['delete_success_details'];
+    unset($_SESSION['delete_success_details']);
+}
+// --- END EDIT/DELETE DATA STORAGE ---
+
+// --- REMOVE AUTH ERROR SESSION VARIABLES (Admin Auth Removed) ---
+unset($_SESSION['auth_error']);
+unset($_SESSION['auth_action']);
+unset($_SESSION['auth_section_id']);
+// --- END REMOVE AUTH ERROR SESSION VARIABLES ---
+
 
 $sections = []; 
 $add_error = false;
@@ -28,10 +49,16 @@ $fetch_error = false;
 
 // --- YEAR FILTER LOGIC ---
 $selected_year = $_GET['year'] ?? 'all'; 
+$valid_years = ['all', 'Year 7', 'Year 8', 'Year 9', 'Year 10', 'Year 11', 'Year 12'];
+
+// Sanitize the selected year
+if (!in_array($selected_year, $valid_years)) {
+    $selected_year = 'all'; 
+}
 // --- END YEAR FILTER LOGIC ---
 
 
-// --- HANDLE POST REQUEST TO ADD A NEW SECTION (Remains the same) ---
+// --- HANDLE POST REQUEST TO ADD A NEW SECTION ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_section') {
     $new_section_name = trim($_POST['section_name'] ?? '');
     $new_teacher_name = trim($_POST['teacher_name'] ?? '');
@@ -40,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (empty($new_section_name) || empty($new_teacher_name) || empty($new_section_year)) {
         $add_error = "Section Name, Assigned Teacher, and Academic Year are all required.";
     } else {
+        // Assuming your 'sections' table has a `created_at` column with a default of CURRENT_TIMESTAMP
         $sql = "INSERT INTO sections (year, name, teacher) VALUES (?, ?, ?)";
         
         if ($stmt = $conn->prepare($sql)) {
@@ -69,49 +97,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 // --- END POST HANDLING (ADD SECTION) ---
 
-// --- HANDLE POST REQUEST TO EDIT/DELETE A SECTION (Admin Auth) ---
+// --- HANDLE POST REQUEST TO EDIT/DELETE/UPDATE A SECTION (Auth Removed) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']) && ($_POST['action'] === 'delete_section' || $_POST['action'] === 'edit_section' || $_POST['action'] === 'update_section'))) {
     
     $action_to_perform = $_POST['action'];
     $section_id = (int)($_POST['section_id'] ?? 0);
-    $admin_password_input = $_POST['admin_password'] ?? '';
     
-    $ADMIN_PASS = "admin123"; // ⚠️ HARDCODED FOR DEMO ⚠️
-
     // -----------------------------------------------------
-    // 1. Admin Password Check (only for delete/edit triggers)
-    // -----------------------------------------------------
-    if ($action_to_perform === 'delete_section' || $action_to_perform === 'edit_section') {
-        if ($admin_password_input !== $ADMIN_PASS) {
-            $_SESSION['auth_error'] = "Authentication failed. Incorrect Admin Password.";
-            $_SESSION['auth_action'] = $action_to_perform; 
-            $_SESSION['auth_section_id'] = $section_id;
-            header("Location: sections.php");
-            exit;
-        }
-    }
-
-    // -----------------------------------------------------
-    // 2. Execute Actions after successful auth
+    // 1. Execute Actions
     // -----------------------------------------------------
     if ($action_to_perform === 'delete_section' && $section_id > 0) {
-        // --- Execute DELETE Logic ---
-        $sql = "DELETE FROM sections WHERE id = ?";
-        if ($stmt = $conn->prepare($sql)) {
-            $stmt->bind_param("i", $section_id);
-            if ($stmt->execute()) {
-                $_SESSION['delete_success'] = "Section ID {$section_id} successfully deleted.";
-                header("Location: sections.php");
-                exit;
-            } else {
-                $add_error = "ERROR: Could not delete section. " . $stmt->error;
+        // 1. Fetch details before deletion for success message
+        $sql_select = "SELECT year, name, teacher FROM sections WHERE id = ?";
+        $deleted_details = null;
+
+        if ($stmt_select = $conn->prepare($sql_select)) {
+            $stmt_select->bind_param("i", $section_id);
+            $stmt_select->execute();
+            $result_select = $stmt_select->get_result();
+            $deleted_details = $result_select->fetch_assoc();
+            $stmt_select->close();
+        }
+
+        // 2. Execute DELETE Logic
+        if ($deleted_details) {
+            $sql_delete = "DELETE FROM sections WHERE id = ?";
+            if ($stmt_delete = $conn->prepare($sql_delete)) {
+                $stmt_delete->bind_param("i", $section_id);
+                if ($stmt_delete->execute()) {
+                    // Store structured data for the success modal
+                    $_SESSION['delete_success_details'] = [
+                        'name' => $deleted_details['name'],
+                        'year' => $deleted_details['year'],
+                        'teacher' => $deleted_details['teacher']
+                    ];
+                    header("Location: sections.php");
+                    exit;
+                } else {
+                    $add_error = "ERROR: Could not delete section. " . $stmt_delete->error;
+                }
+                $stmt_delete->close();
             }
-            $stmt->close();
+        } else {
+             $add_error = "ERROR: Section not found for deletion.";
         }
     }
     
     if ($action_to_perform === 'edit_section' && $section_id > 0) {
-        // --- AUTHENTICATION SUCCESS: Fetch data to populate the modal ---
+        // --- Fetch data to populate the modal ---
         $sql = "SELECT id, year, name, teacher FROM sections WHERE id = ?";
         if ($stmt = $conn->prepare($sql)) {
             $stmt->bind_param("i", $section_id);
@@ -137,16 +170,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']) && ($_POST
         if (!empty($updated_name) && !empty($updated_teacher) && !empty($updated_year)) {
              $sql = "UPDATE sections SET year = ?, name = ?, teacher = ? WHERE id = ?";
              if ($stmt = $conn->prepare($sql)) {
-                $stmt->bind_param("sssi", $updated_year, $updated_name, $updated_teacher, $section_id);
-                if ($stmt->execute()) {
-                    $_SESSION['edit_success'] = "Section {$updated_name} (ID: {$section_id}) successfully updated.";
-                    header("Location: sections.php");
-                    exit;
-                } else {
-                    $add_error = "ERROR: Could not update section. " . $stmt->error;
-                }
-                $stmt->close();
-            }
+                 $stmt->bind_param("sssi", $updated_year, $updated_name, $updated_teacher, $section_id);
+                 if ($stmt->execute()) {
+                     // Store structured data for the success modal
+                     $_SESSION['edit_success_details'] = [
+                         'name' => $updated_name,
+                         'year' => $updated_year,
+                         'teacher' => $updated_teacher
+                     ];
+                     header("Location: sections.php");
+                     exit;
+                 } else {
+                     $add_error = "ERROR: Could not update section. " . $stmt->error;
+                 }
+                 $stmt->close();
+             }
         } else {
             $add_error = "ERROR: All fields are required for section update.";
         }
@@ -155,44 +193,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']) && ($_POST
 // --- END ADMIN ACTION HANDLING ---
 
 
-// --- FETCH ALL SECTIONS (WITH FILTER) ---
-// 1. Fetch available years for the filter buttons
-$sql_fetch = "SELECT DISTINCT year FROM sections ORDER BY year ASC";
-$years = ['all']; 
-if ($result_years = $conn->query($sql_fetch)) {
-    while ($row = $result_years->fetch_assoc()) {
-        $years[] = htmlspecialchars($row['year']);
-    }
-}
-
-// 2. Fetch sections based on the selected year
+// --- FETCH ALL SECTIONS (LATEST FIRST) WITH FILTERING ---
 $sql_fetch = "SELECT id, year, name, teacher, created_at FROM sections";
-$where_clause = "";
+$where_clause = '';
+$params = [];
+$types = '';
 
 if ($selected_year !== 'all') {
-    $where_clause = " WHERE year = '" . $conn->real_escape_string($selected_year) . "'";
+    $where_clause = " WHERE year = ?";
+    $params[] = $selected_year;
+    $types .= 's';
 }
 
-$sql_fetch .= $where_clause . " ORDER BY year ASC, name ASC";
+$sql_fetch .= $where_clause . " ORDER BY created_at DESC, year ASC, name ASC";
 
-if ($result = $conn->query($sql_fetch)) {
-    if ($result->num_rows > 0) {
-        while ($row = $result->fetch_assoc()) {
-            $sections[] = [
-                'id' => $row['id'],
-                'year' => $row['year'],
-                'name' => $row['name'],
-                'teacher' => $row['teacher'],
-                'created_at' => $row['created_at'], 
-                'students' => [] // Mocked student data
-            ];
+
+if ($stmt = $conn->prepare($sql_fetch)) {
+    if (!empty($params)) {
+        // Use call_user_func_array for dynamic parameter binding
+        $bind_names = [$types];
+        for ($i=0; $i<count($params); $i++) {
+            $bind_names[] = &$params[$i];
         }
+        call_user_func_array([$stmt, 'bind_param'], $bind_names);
     }
+    
+    if ($stmt->execute()) {
+        $result = $stmt->get_result();
+        if ($result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $sections[] = [
+                    'id' => $row['id'],
+                    'year' => $row['year'],
+                    'name' => $row['name'],
+                    'teacher' => $row['teacher'],
+                    'created_at' => $row['created_at'], 
+                    'students' => [] // Mocked student data
+                ];
+            }
+        }
+    } else {
+        $fetch_error = "ERROR: Could not execute the fetch statement. " . $stmt->error;
+    }
+    $stmt->close();
 } else {
-    $fetch_error = "ERROR: Could not retrieve sections from the database: " . $conn->error;
+    $fetch_error = "ERROR: Could not prepare the fetch statement. " . $conn->error;
 }
 
-$conn->close();
+
+// Check if $conn is still open before closing
+if (isset($conn)) {
+    $conn->close();
+}
 
 ?>
 <!DOCTYPE html>
@@ -226,6 +278,12 @@ tailwind.config = {
 <body class="bg-page-bg min-h-screen flex">
 
 <?php 
+// --- COMPONENT: Full-Page Loading Overlay ---
+include 'components/loading_overlay.php'; 
+?>
+
+<?php 
+// NOTE: These files must exist in their respective paths
 include 'components/sidebar.php'; 
 ?>
 
@@ -249,20 +307,6 @@ include 'components/sidebar.php';
         </div>
     <?php endif; ?>
 
-    <?php if (isset($_SESSION['delete_success'])): ?>
-        <div class="mb-6 p-4 rounded-lg bg-green-50 border border-green-200 text-green-700 flex items-center space-x-2 shadow-sm" role="alert">
-            <i data-lucide="check-circle" class="w-5 h-5 flex-shrink-0"></i>
-            <span><?php echo $_SESSION['delete_success']; ?></span>
-        </div>
-    <?php unset($_SESSION['delete_success']); endif; ?>
-    
-    <?php if (isset($_SESSION['edit_success'])): ?>
-        <div class="mb-6 p-4 rounded-lg bg-green-50 border border-green-200 text-green-700 flex items-center space-x-2 shadow-sm" role="alert">
-            <i data-lucide="check-circle" class="w-5 h-5 flex-shrink-0"></i>
-            <span><?php echo $_SESSION['edit_success']; ?></span>
-        </div>
-    <?php unset($_SESSION['edit_success']); endif; ?>
-
 
     <div class="lg:col-span-3">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
@@ -271,25 +315,8 @@ include 'components/sidebar.php';
                 <span>All Sections (<?php echo count($sections); ?>)</span>
             </h2>
 
-            <div class="flex space-x-2 p-1 bg-gray-100 rounded-xl shadow-inner overflow-x-auto">
-                <?php 
-                $year_tabs = array_unique($years); 
-                ?>
-                
-                <?php foreach ($year_tabs as $year_option): 
-                    $is_selected = $selected_year === $year_option;
-                    $display_text = $year_option === 'all' ? 'All Years' : $year_option;
-                    $class = $is_selected 
-                        ? 'bg-white text-primary-blue font-bold shadow-md' 
-                        : 'text-gray-600 hover:bg-gray-200';
-                ?>
-                    <a href="sections.php?year=<?php echo $year_option; ?>" 
-                        class="px-4 py-2 text-sm rounded-lg transition duration-150 whitespace-nowrap <?php echo $class; ?>">
-                        <?php echo $display_text; ?>
-                    </a>
-                <?php endforeach; ?>
-            </div>
-            </div>
+            <?php include 'components/year_filter.php'; ?>
+        </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <?php if (empty($sections)): ?>
@@ -297,15 +324,12 @@ include 'components/sidebar.php';
                 <i data-lucide="inbox" class="w-16 h-16 text-gray-300 mx-auto mb-4"></i>
                 <h3 class="text-xl font-semibold text-gray-800">No Sections Found</h3>
                 <p class="text-gray-500 mt-2">
-                    <?php if ($selected_year !== 'all'): ?>
-                        No sections found for academic year **<?php echo htmlspecialchars($selected_year); ?>**.
-                    <?php else: ?>
-                        Click the "Add New Section" button above to create your first section.
-                    <?php endif; ?>
+                    Click the "Add New Section" button above to create your first section.
                 </p>
             </div>
         <?php else: ?>
             <?php foreach ($sections as $section): 
+                // Assuming 'components/section_card.php' exists
                 include 'components/section_card.php'; 
             endforeach; ?>
         <?php endif; ?>
@@ -314,16 +338,21 @@ include 'components/sidebar.php';
 </main>
 
 <?php 
+// NOTE: These files must exist in their respective paths
 include 'components/add_section_modal.php'; 
 include 'components/success_modal.php'; 
-include 'components/admin_auth_modal.php'; 
-// --- NEW EDIT MODAL INCLUDE ---
 include 'components/edit_section_modal.php'; 
+include 'components/delete_confirmation_modal.php'; 
 
 
 $success_json = json_encode($add_success_details);
-$edit_data_json = json_encode($section_to_edit); // Pass fetched data to JS
+$edit_success_json = json_encode($edit_success_details); 
+$delete_success_json = json_encode($delete_success_details); 
+$edit_data_json = json_encode($section_to_edit); 
+
 echo "<script>const successDetails = {$success_json};</script>";
+echo "<script>const editSuccessDetails = {$edit_success_json};</script>"; 
+echo "<script>const deleteSuccessDetails = {$delete_success_json};</script>"; 
 echo "<script>const sectionToEdit = {$edit_data_json};</script>";
 ?>
 
@@ -331,7 +360,17 @@ echo "<script>const sectionToEdit = {$edit_data_json};</script>";
 document.addEventListener('DOMContentLoaded', function() {
     lucide.createIcons();
 
-    // --- Modal Elements (Add/Success) ---
+    // --- Loading Overlay Fix/Cleanup ---
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay && !overlay.classList.contains('hidden')) {
+        overlay.classList.add('opacity-0');
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+        }, 300);
+    }
+    // --- END Loading Overlay Fix/Cleanup ---
+
+    // --- Modal Elements ---
     const modal = document.getElementById('addSectionModal');
     const modalContent = document.getElementById('modalContent');
     const openBtn = document.getElementById('openModalBtn');
@@ -341,28 +380,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const successModalContent = document.getElementById('successModalContent');
     const closeSuccessModalBtn = document.getElementById('closeSuccessModalBtn');
 
-    // ... (rest of the add/success elements)
-
     const addSectionForm = document.getElementById('addSectionForm');
     const saveSectionBtn = document.getElementById('saveSectionBtn');
     const saveIcon = document.getElementById('saveIcon');
     const saveText = document.getElementById('saveText');
     const loadingSpinner = document.getElementById('loadingSpinner');
 
-    // --- ADMIN MODAL ELEMENTS ---
-    const adminAuthModal = document.getElementById('adminAuthModal');
-    const adminAuthModalContent = document.getElementById('adminAuthModalContent');
-    const closeAdminAuthModalBtn = document.getElementById('closeAdminAuthModalBtn');
-    const adminAuthForm = document.getElementById('adminAuthForm');
-    const authActionText = document.getElementById('authActionText');
-    const authSectionName = document.getElementById('authSectionName');
-    const authSectionId = document.getElementById('authSectionId');
-    const authHiddenAction = document.getElementById('authHiddenAction');
-    const authHiddenSectionId = document.getElementById('authHiddenSectionId');
-    const authError = document.getElementById('authError');
-    const adminPasswordInput = document.getElementById('admin_password');
-
-    // --- NEW EDIT MODAL ELEMENTS ---
+    // --- EDIT MODAL ELEMENTS ---
     const editModal = document.getElementById('editSectionModal');
     const editModalContent = document.getElementById('editModalContent');
     const closeEditModalBtn = document.getElementById('closeEditModalBtn');
@@ -371,6 +395,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const editSectionNameInput = document.getElementById('edit_modal_section_name');
     const editTeacherNameInput = document.getElementById('edit_modal_teacher_name');
     const editYearRadios = document.getElementsByName('edit_section_year');
+
+    // --- DELETE MODAL ELEMENTS ---
+    const deleteModal = document.getElementById('deleteConfirmationModal');
+    const deleteModalContent = document.getElementById('deleteModalContent');
+    const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    const deleteSectionNameSpan = document.getElementById('deleteSectionName');
+    
+    // --- LOADING TEXT ELEMENT ---
+    const loadingMessageText = document.getElementById('loadingMessageText');
+
+    // --- SUCCESS DESCRIPTION ELEMENT (NEW) ---
+    const successModalDescription = document.getElementById('success-modal-description');
 
 
     // --- Generic Modal Functions ---
@@ -391,52 +428,83 @@ document.addEventListener('DOMContentLoaded', function() {
         
         setTimeout(() => {
             targetModal.classList.add('hidden');
-            if(modal.classList.contains('hidden') && successModal.classList.contains('hidden') && adminAuthModal.classList.contains('hidden') && editModal.classList.contains('hidden')) {
+            // Check all modals before resetting overflow (UPDATED CHECK)
+            if(modal.classList.contains('hidden') && successModal.classList.contains('hidden') && editModal.classList.contains('hidden') && deleteModal.classList.contains('hidden')) {
                 document.body.style.overflow = '';
             }
         }, 300); 
     };
 
-    // --- ADMIN AUTH LOGIC ---
-    window.confirmAdminAction = function(action, sectionId, sectionName) {
-        // Set the text and hidden fields
-        authActionText.textContent = action.toUpperCase();
-        authSectionName.textContent = sectionName;
-        authSectionId.textContent = sectionId;
-        authHiddenAction.value = action + '_section';
-        authHiddenSectionId.value = sectionId;
-        
-        // Clear previous error/input
-        authError.classList.add('hidden');
-        adminPasswordInput.value = '';
+    // Function to trigger the PHP edit action 
+    window.initiateEditAction = function(sectionId) {
+        // ... (Code to submit edit action)
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'sections.php';
 
-        // Open the modal
-        openModal(adminAuthModal, adminAuthModalContent);
+        const actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = 'edit_section'; 
+        form.appendChild(actionInput);
+
+        const idInput = document.createElement('input');
+        idInput.type = 'hidden';
+        idInput.name = 'section_id';
+        idInput.value = sectionId;
+        form.appendChild(idInput);
+
+        document.body.appendChild(form);
+        form.submit();
+    };
+
+    // Function to open the confirmation modal 
+    window.confirmDeleteAction = function(sectionId, sectionName) {
+        deleteSectionNameSpan.textContent = sectionName;
+        confirmDeleteBtn.setAttribute('data-section-id', sectionId);
+        openModal(deleteModal, deleteModalContent);
+    };
+
+    // Function to execute the delete after confirmation (shows overlay)
+    window.executeDeleteAction = function(sectionId) {
+        // 1. Hide the confirmation modal
+        closeModal(deleteModal, deleteModalContent);
+
+        // 2. Show the loading overlay 
+        if (overlay) {
+            // Set the message specifically for deletion
+            if (loadingMessageText) {
+                loadingMessageText.textContent = 'Deleting Section...'; 
+            }
+            
+            overlay.classList.remove('hidden', 'opacity-0');
+            setTimeout(() => {
+                 overlay.classList.add('opacity-100');
+            }, 10);
+        }
+
+        // 3. Create a temporary form to submit the delete action
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'sections.php';
+
+        const actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = 'delete_section';
+        form.appendChild(actionInput);
+
+        const idInput = document.createElement('input');
+        idInput.type = 'hidden';
+        idInput.name = 'section_id';
+        idInput.value = sectionId;
+        form.appendChild(idInput);
+
+        document.body.appendChild(form);
+        form.submit();
     };
     
-    // Check for authentication error session variable on load and display it
-    <?php if (isset($_SESSION['auth_error'])): ?>
-        const authErrorMsg = "<?php echo $_SESSION['auth_error']; ?>";
-        const authAction = "<?php echo $_SESSION['auth_action']; ?>";
-        const authSectionID = "<?php echo $_SESSION['auth_section_id']; ?>";
-
-        authError.textContent = authErrorMsg;
-        authError.classList.remove('hidden');
-        
-        // Re-open the modal with the error context
-        authActionText.textContent = authAction.replace('_section', '').toUpperCase();
-        authSectionId.textContent = authSectionID;
-        authHiddenAction.value = authAction;
-        authHiddenSectionId.value = authSectionID;
-        
-        // Note: Section name cannot be reliably retrieved after redirect, so it's omitted here.
-        
-        openModal(adminAuthModal, adminAuthModalContent);
-
-        // Clear session variables after displaying (done in PHP above, but good practice to know)
-    <?php endif; ?>
-
-    // --- NEW: EDIT MODAL POPULATION & TRIGGER ---
+    // --- EDIT MODAL POPULATION & TRIGGER ---
     if (sectionToEdit) {
         // 1. Populate the form fields
         editSectionIdInput.value = sectionToEdit.id;
@@ -460,8 +528,17 @@ document.addEventListener('DOMContentLoaded', function() {
     openBtn.addEventListener('click', () => openModal(modal, modalContent));
     closeBtn.addEventListener('click', () => closeModal(modal, modalContent));
     closeSuccessModalBtn.addEventListener('click', () => closeModal(successModal, successModalContent));
-    closeAdminAuthModalBtn.addEventListener('click', () => closeModal(adminAuthModal, adminAuthModalContent));
-    closeEditModalBtn.addEventListener('click', () => closeModal(editModal, editModalContent)); // New listener
+    closeEditModalBtn.addEventListener('click', () => closeModal(editModal, editModalContent)); 
+    
+    // Delete Modal Listeners
+    cancelDeleteBtn.addEventListener('click', () => closeModal(deleteModal, deleteModalContent));
+    confirmDeleteBtn.addEventListener('click', function() {
+        const sectionId = this.getAttribute('data-section-id');
+        if (sectionId) {
+            executeDeleteAction(sectionId);
+        }
+    });
+
 
     // Modal click-off handlers
     modal.addEventListener('click', (e) => {
@@ -470,11 +547,11 @@ document.addEventListener('DOMContentLoaded', function() {
     successModal.addEventListener('click', (e) => {
         if (e.target === successModal) { closeModal(successModal, successModalContent); }
     });
-    adminAuthModal.addEventListener('click', (e) => {
-        if (e.target === adminAuthModal) { closeModal(adminAuthModal, adminAuthModalContent); }
-    });
-    editModal.addEventListener('click', (e) => { // New listener
+    editModal.addEventListener('click', (e) => { 
         if (e.target === editModal) { closeModal(editModal, editModalContent); }
+    });
+    deleteModal.addEventListener('click', (e) => { 
+        if (e.target === deleteModal) { closeModal(deleteModal, deleteModalContent); }
     });
     
     // Custom scrollbar CSS injection for better UI
@@ -496,6 +573,61 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     `;
     document.head.appendChild(style);
+
+    // --- Add/Update/Delete Success Logic (MODIFIED to handle dynamic descriptions) ---
+    let detailsToShow = null;
+    let modalTitle = '';
+    let modalDescription = ''; 
+    
+    // Check for ADD success 
+    if (successDetails && successDetails.name) {
+        detailsToShow = successDetails;
+        modalTitle = 'Section Added Successfully!';
+        modalDescription = 'The new section has been saved to the database.';
+    } 
+    // Check for EDIT success
+    else if (editSuccessDetails && editSuccessDetails.name) {
+        detailsToShow = editSuccessDetails;
+        modalTitle = 'Section Updated Successfully!';
+        modalDescription = 'The section details have been successfully updated.';
+    }
+    // Check for DELETE success
+    else if (deleteSuccessDetails && deleteSuccessDetails.name) {
+        detailsToShow = deleteSuccessDetails;
+        modalTitle = 'Section Deleted Successfully!';
+        modalDescription = 'The section was permanently removed from the system.'; // Correct delete message
+    }
+
+
+    if (detailsToShow) {
+        // 1. Update the success modal's dynamic content
+        document.getElementById('success-modal-title').textContent = modalTitle;
+        
+        if (successModalDescription) {
+            successModalDescription.textContent = modalDescription; // Set the correct description text
+        }
+
+        document.getElementById('modalSectionName').textContent = detailsToShow.name;
+        document.getElementById('modalSectionYear').textContent = detailsToShow.year;
+        document.getElementById('modalTeacherName').textContent = detailsToShow.teacher;
+        
+        // 2. Reset the form and button/spinner state for the ADD modal only
+        if (addSectionForm) {
+            addSectionForm.reset(); 
+
+            // Reset loading state for the button in the 'add section' modal
+            if(saveIcon && saveText && loadingSpinner && saveSectionBtn) {
+                saveIcon.classList.remove('hidden');
+                saveText.textContent = 'Save Section';
+                loadingSpinner.classList.add('hidden');
+                saveSectionBtn.disabled = false;
+                saveSectionBtn.classList.add('hover:bg-blue-700');
+                saveSectionBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
+        }
+
+        openModal(successModal, successModalContent);
+    }
 });
 </script>
 </body>

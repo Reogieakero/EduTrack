@@ -29,7 +29,24 @@ if ($created_at_timestamp) {
 <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-200 transition duration-300 hover:shadow-xl">
     <div class="flex justify-between items-start mb-4 pb-4 border-b">
         <div>
-            <h3 class="text-2xl font-bold text-gray-900"><?php echo htmlspecialchars($section['name']); ?></h3>
+            <div class="flex items-center space-x-3">
+                <h3 class="text-2xl font-bold text-gray-900"><?php echo htmlspecialchars($section['name']); ?></h3>
+                
+                <button 
+                    onclick="initiateEditAction('<?php echo htmlspecialchars($section['id']); ?>')"
+                    class="text-gray-400 hover:text-primary-blue p-1 rounded-full transition duration-150" 
+                    title="Edit Section">
+                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                </button>
+                
+                <button 
+                    onclick="confirmDeleteAction('<?php echo htmlspecialchars($section['id']); ?>', '<?php echo htmlspecialchars($section['name']); ?>')"
+                    class="text-gray-400 hover:text-red-500 p-1 rounded-full transition duration-150" 
+                    title="Delete Section">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            </div>
+            
             <p class="text-sm text-gray-600 mt-1">
                 <span class="font-bold text-primary-blue mr-4"><?php echo $year_display; ?></span>
                 Teacher: <span class="font-medium text-primary-green"><?php echo $teacher_display; ?></span>
@@ -39,7 +56,7 @@ if ($created_at_timestamp) {
                 <i data-lucide="clock" class="w-3 h-3 flex-shrink-0"></i>
                 <span>Added At: <?php echo $created_at_display; ?></span>
             </p>
-            </div>
+        </div>
         <div class="text-right p-3 bg-gray-50 rounded-lg border border-gray-200">
             <span class="text-3xl font-extrabold text-primary-blue"><?php echo $student_count; ?></span>
             <p class="text-sm text-gray-500 mt-0.5">Students</p>

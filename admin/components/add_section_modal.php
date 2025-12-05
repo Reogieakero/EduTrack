@@ -53,3 +53,29 @@
         </div>
     </div>
 </div>
+
+<script>
+    // This script should be added within sections.php document.addEventListener('DOMContentLoaded', ...) block
+    document.addEventListener('DOMContentLoaded', function() {
+        const addSectionForm = document.getElementById('addSectionForm');
+        const saveSectionBtn = document.getElementById('saveSectionBtn');
+        const saveIcon = document.getElementById('saveIcon');
+        const saveText = document.getElementById('saveText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+
+        if (addSectionForm) {
+            addSectionForm.addEventListener('submit', function(event) {
+                // Check if all required fields are filled before showing spinner
+                if (addSectionForm.checkValidity()) {
+                    // Show loading state
+                    saveIcon.classList.add('hidden');
+                    saveText.textContent = 'Saving...';
+                    loadingSpinner.classList.remove('hidden');
+                    saveSectionBtn.disabled = true; // Prevent multiple submissions
+                    saveSectionBtn.classList.remove('hover:bg-blue-700');
+                    saveSectionBtn.classList.add('opacity-70', 'cursor-not-allowed');
+                }
+            });
+        }
+    });
+</script>
