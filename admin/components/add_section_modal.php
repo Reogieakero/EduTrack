@@ -13,10 +13,27 @@
             
             <form method="POST" action="sections.php" class="space-y-5 pt-6">
                 <input type="hidden" name="action" value="add_section">
+
                 <div>
-                    <label for="modal_section_name" class="block text-sm font-medium text-gray-700 mb-1">Section Name</label>
-                    <input type="text" id="modal_section_name" name="section_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue transition duration-150 shadow-sm" placeholder="e.g., Grade 9 - Ruby">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Academic Year</label>
+                    <div class="flex flex-wrap gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <?php 
+                        $academic_years = ['Year 7', 'Year 8', 'Year 9', 'Year 10', 'Year 11', 'Year 12'];
+                        foreach ($academic_years as $year):
+                        ?>
+                        <label for="year_<?php echo str_replace(' ', '_', $year); ?>" class="flex items-center space-x-2 cursor-pointer p-2 rounded-lg transition duration-150 border border-transparent hover:border-primary-blue/50">
+                            <input type="radio" id="year_<?php echo str_replace(' ', '_', $year); ?>" name="section_year" value="<?php echo htmlspecialchars($year); ?>" required class="form-radio text-primary-blue h-4 w-4 focus:ring-primary-blue">
+                            <span class="text-sm font-medium text-gray-700"><?php echo $year; ?></span>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
+
+                <div>
+                    <label for="modal_section_name" class="block text-sm font-medium text-gray-700 mb-1">Section Name (e.g., Diamond, Sapphire)</label>
+                    <input type="text" id="modal_section_name" name="section_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue transition duration-150 shadow-sm" placeholder="e.g., Diamond">
+                </div>
+                
                 <div>
                     <label for="modal_teacher_name" class="block text-sm font-medium text-gray-700 mb-1">Assigned Teacher</label>
                     <input type="text" id="modal_teacher_name" name="teacher_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue transition duration-150 shadow-sm" placeholder="e.g., Mr. Jonathan Doe">

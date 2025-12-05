@@ -6,23 +6,71 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     exit;
 }
 
+require_once '../config/database.php';
+
+if (isset($_SESSION['add_success'])) {
+    $add_success = $_SESSION['add_success'];
+    unset($_SESSION['add_success']); 
+} else {
+    $add_success = false;
+}
+
 $current_user = htmlspecialchars($_SESSION['username'] ?? 'Admin User'); 
 
 $sections = []; 
-
-$add_success = false;
 $add_error = false;
+$fetch_error = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_section') {
     $new_section_name = trim($_POST['section_name'] ?? '');
     $new_teacher_name = trim($_POST['teacher_name'] ?? '');
+    $new_section_year = trim($_POST['section_year'] ?? '');
     
-    if (!empty($new_section_name) && !empty($new_teacher_name)) {
-        $add_success = "New section '{$new_section_name}' assigned to {$new_teacher_name} has been added (Non-Persistent Mock Success). Connect to a database to save data permanently.";
+    if (empty($new_section_name) || empty($new_teacher_name) || empty($new_section_year)) {
+        $add_error = "Section Name, Assigned Teacher, and Academic Year are all required.";
     } else {
-        $add_error = "Both Section Name and Teacher Name are required.";
+        $sql = "INSERT INTO sections (year, name, teacher) VALUES (?, ?, ?)";
+        
+        if ($stmt = $conn->prepare($sql)) {
+            $stmt->bind_param("sss", $param_year, $param_name, $param_teacher);
+            
+            $param_year = $new_section_year;
+            $param_name = $new_section_name;
+            $param_teacher = $new_teacher_name;
+            
+            if ($stmt->execute()) {
+                $_SESSION['add_success'] = "New section '{$new_section_name}' ({$new_section_year}) assigned to {$new_teacher_name} has been added and **SAVED TO THE DATABASE**.";
+                header("Location: sections.php");
+                exit;
+            } else {
+                $add_error = "ERROR: Could not execute the insert statement. " . $stmt->error;
+            }
+
+            $stmt->close();
+        } else {
+            $add_error = "ERROR: Could not prepare the insert statement. " . $conn->error;
+        }
     }
 }
+
+$sql_fetch = "SELECT id, year, name, teacher FROM sections ORDER BY year, name";
+if ($result = $conn->query($sql_fetch)) {
+    if ($result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $sections[] = [
+                'id' => $row['id'],
+                'year' => $row['year'],
+                'name' => $row['name'],
+                'teacher' => $row['teacher'],
+                'students' => [] 
+            ];
+        }
+    }
+} else {
+    $fetch_error = "ERROR: Could not retrieve sections from the database: " . $conn->error;
+}
+
+$conn->close();
 
 ?>
 <!DOCTYPE html>
@@ -79,10 +127,10 @@ include 'components/sidebar.php';
         </div>
     <?php endif; ?>
 
-    <?php if ($add_error): ?>
+    <?php if ($add_error || $fetch_error): ?>
         <div class="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 flex items-center space-x-2 shadow-sm" role="alert">
             <i data-lucide="alert-triangle" class="w-5 h-5 flex-shrink-0"></i>
-            <span><?php echo $add_error; ?></span>
+            <span><?php echo $add_error ?? $fetch_error; ?></span>
         </div>
     <?php endif; ?>
 
@@ -98,21 +146,27 @@ include 'components/sidebar.php';
                     <i data-lucide="inbox" class="w-16 h-16 text-gray-300 mx-auto mb-4"></i>
                     <h3 class="text-xl font-semibold text-gray-800">No Sections Found</h3>
                     <p class="text-gray-500 mt-2">Click the "Add New Section" button above to create your first section.</p>
-                    <p class="text-sm text-red-500 mt-4 italic">Note: Data is not persistent until a database connection is implemented.</p>
+                    <?php if (!$fetch_error): ?>
+                        <p class="text-sm text-primary-blue mt-4 italic">Sections will now be saved to your MySQL database.</p>
+                    <?php endif; ?>
                 </div>
             <?php else: ?>
                 <?php foreach ($sections as $section): 
-                    $section['teacher'] = $section['teacher'] ?? 'Unassigned';
-                    $section['students'] = $section['students'] ?? [];
+                    $student_count = count($section['students'] ?? []);
+                    $teacher_display = htmlspecialchars($section['teacher'] ?? 'Unassigned');
+                    $year_display = htmlspecialchars($section['year'] ?? 'N/A');
                 ?>
                     <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-200 transition duration-300 hover:shadow-xl">
                         <div class="flex justify-between items-start mb-4 pb-4 border-b">
                             <div>
                                 <h3 class="text-2xl font-bold text-gray-900"><?php echo htmlspecialchars($section['name']); ?></h3>
-                                <p class="text-sm text-gray-600 mt-1">Teacher: <span class="font-medium text-primary-green"><?php echo htmlspecialchars($section['teacher']); ?></span></p>
+                                <p class="text-sm text-gray-600 mt-1">
+                                    Year: <span class="font-bold text-primary-blue mr-4"><?php echo $year_display; ?></span>
+                                    Teacher: <span class="font-medium text-primary-green"><?php echo $teacher_display; ?></span>
+                                </p>
                             </div>
                             <div class="text-right p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                <span class="text-3xl font-extrabold text-primary-blue"><?php echo count($section['students']); ?></span>
+                                <span class="text-3xl font-extrabold text-primary-blue"><?php echo $student_count; ?></span>
                                 <p class="text-sm text-gray-500 mt-0.5">Students</p>
                             </div>
                         </div>
@@ -123,7 +177,7 @@ include 'components/sidebar.php';
                                 <span>Students in Section:</span>
                             </h4>
                             
-                            <?php if (!empty($section['students'])): ?>
+                            <?php if ($student_count > 0): ?>
                                 <ul class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm text-gray-700 max-h-48 overflow-y-auto pr-2 custom-scroll">
                                     <?php foreach ($section['students'] as $student): ?>
                                         <li class="flex items-center space-x-2 p-2 rounded-lg bg-gray-100/70 border border-gray-200">
