@@ -46,14 +46,13 @@ tailwind.config = {
 
 <?php include 'sidebar.php'; ?>
 
-<main class="flex-grow md:ml-64 p-8">
+<main class="flex-grow ml-16 md:ml-56 p-8">
     <header class="mb-8 border-b pb-4">
         <h1 class="text-4xl font-semibold text-gray-800">Admin Dashboard</h1>
         <p class="text-gray-500 mt-1">Overview and management of the EduTrack system.</p>
     </header>
 
     <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-6">
-        <!-- Sections Card -->
         <div class="relative overflow-hidden rounded-2xl shadow-lg p-6 bg-gradient-to-r from-white to-friendly-blue transition-transform duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer">
             <div class="flex items-center justify-between">
                 <div>
@@ -67,7 +66,6 @@ tailwind.config = {
             <p class="mt-4 text-sm text-gray-600 flex items-center">Total Sections</p>
         </div>
 
-        <!-- Students Card -->
         <div class="relative overflow-hidden rounded-2xl shadow-lg p-6 bg-gradient-to-r from-white to-friendly-green transition-transform duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer">
             <div class="flex items-center justify-between">
                 <div>
@@ -81,7 +79,6 @@ tailwind.config = {
             <p class="mt-4 text-sm text-gray-600 flex items-center">Total Students</p>
         </div>
 
-        <!-- Parents Card -->
         <div class="relative overflow-hidden rounded-2xl shadow-lg p-6 bg-gradient-to-r from-white to-friendly-yellow transition-transform duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer">
             <div class="flex items-center justify-between">
                 <div>
@@ -95,7 +92,6 @@ tailwind.config = {
             <p class="mt-4 text-sm text-gray-600 flex items-center">Total Parents</p>
         </div>
 
-        <!-- Teachers Card -->
         <div class="relative overflow-hidden rounded-2xl shadow-lg p-6 bg-gradient-to-r from-white to-friendly-purple transition-transform duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer">
             <div class="flex items-center justify-between">
                 <div>
