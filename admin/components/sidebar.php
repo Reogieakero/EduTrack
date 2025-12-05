@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const mainContent = document.querySelector('main');
     if (mainContent) {
         if (window.innerWidth < 768) {
-             mainContent.style.marginLeft = '4rem'; // w-16 = 4rem
+             mainContent.style.marginLeft = '4rem';
         }
         
         window.addEventListener('resize', () => {
