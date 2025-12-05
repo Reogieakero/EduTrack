@@ -22,6 +22,11 @@ if (!isset($current_user)) {
         <p class="pt-4 pb-2 px-3 text-xs uppercase tracking-widest text-gray-400 font-medium">User Management</p>
 
         <a href="#" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-primary-hover transition duration-150 group">
+            <i data-lucide="layers" class="w-5 h-5 text-sidebar-text group-hover:text-active-link"></i>
+            <span>Section</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-primary-hover transition duration-150 group">
             <i data-lucide="user-cog" class="w-5 h-5 text-sidebar-text group-hover:text-active-link"></i>
             <span>Students</span>
         </a>
@@ -32,7 +37,7 @@ if (!isset($current_user)) {
         </a>
 
         <a href="#" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-primary-hover transition duration-150 group">
-            <i data-lucide="school" class="w-5 h-5 text-sidebar-text group-hover:text-active-link"></i>
+            <i data-lucide="graduation-cap" class="w-5 h-5 text-sidebar-text group-hover:text-active-link"></i>
             <span>Teachers</span>
         </a>
     </nav>
