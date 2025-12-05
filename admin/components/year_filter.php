@@ -27,39 +27,29 @@ $display_name = ($selected_year === 'all') ? 'All Years' : $selected_year;
         <button type="button" 
                 class="flex justify-between items-center w-full py-2 pl-4 pr-3 border border-gray-300 bg-white 
                        rounded-lg shadow-md hover:border-primary-blue/50 
-                       text-gray-700 font-medium cursor-pointer 
-                       focus:outline-none focus:ring-2 focus:ring-primary-blue focus:border-primary-blue 
-                       transition duration-200"
-                aria-haspopup="listbox"
+                       text-gray-800 font-medium transition duration-150 focus:outline-none focus:ring-2 focus:ring-primary-blue"
                 aria-expanded="false"
-                aria-labelledby="custom-year-filter-label"
-                onclick="toggleDropdown(this)">
+                aria-haspopup="listbox"
+                onclick="toggleYearDropdown(this)">
             
-            <span id="selected-year-text" class="truncate text-sm"><?php echo htmlspecialchars($display_name); ?></span>
-            <i data-lucide="chevron-down" class="w-4 h-4 ml-2 text-gray-500"></i>
+            <span class="truncate"><?php echo $display_name; ?></span>
+            <i data-lucide="chevron-down" class="w-4 h-4 text-gray-500 transition duration-150"></i>
         </button>
-        
+
         <ul id="year-filter-options" 
-            class="absolute z-10 w-full mt-2 bg-white border border-gray-200 
-                   rounded-lg shadow-xl focus:outline-none hidden" 
-            tabindex="-1" role="listbox" 
-            aria-labelledby="selected-year-text">
+            class="absolute z-10 w-full mt-2 bg-white border border-gray-300 rounded-lg shadow-xl py-1 hidden 
+                   max-h-60 overflow-y-auto"
+            role="listbox">
             
             <?php foreach ($valid_years as $year): 
-                $option_display_name = ($year === 'all') ? 'All Years' : $year;
-                $is_selected = ($selected_year === $year);
+                $isActive = ($year === $selected_year);
+                $link_text = ($year === 'all') ? 'All Years' : $year;
             ?>
-                <li class="py-2 px-3 cursor-pointer text-gray-900 text-sm transition-colors duration-150
-                           <?php echo $is_selected ? 'bg-primary-blue text-white font-semibold' : 'hover:bg-gray-100'; ?>"
-                    role="option" 
-                    aria-selected="<?php echo $is_selected ? 'true' : 'false'; ?>"
-                    onclick="handleFilterSelect('<?php echo htmlspecialchars($year); ?>')">
-                    
-                    <?php echo htmlspecialchars($option_display_name); ?>
-                    
-                    <?php if ($is_selected): ?>
-                        <i data-lucide="check" class="w-4 h-4 inline-block ml-2 align-middle"></i>
-                    <?php endif; ?>
+                <li role="option" 
+                    aria-selected="<?php echo $isActive ? 'true' : 'false'; ?>"
+                    class="cursor-pointer px-4 py-2 text-gray-700 hover:bg-primary-blue/10 transition duration-100 <?php echo $isActive ? 'bg-primary-blue/10 font-bold text-primary-blue' : ''; ?>"
+                    onclick="handleFilterSelect('<?php echo urlencode($year); ?>')">
+                    <?php echo $link_text; ?>
                 </li>
             <?php endforeach; ?>
         </ul>
@@ -67,9 +57,9 @@ $display_name = ($selected_year === 'all') ? 'All Years' : $selected_year;
 </div>
 
 <script>
-    // --- Custom Filter Dropdown JS Logic ---
-    function toggleDropdown(buttonElement) {
-        const optionsList = buttonElement.nextElementSibling;
+    // Component JS for dropdown functionality and filter redirection (must stay here for immediate feedback)
+    function toggleYearDropdown(buttonElement) {
+        const optionsList = document.getElementById('year-filter-options');
         const isHidden = optionsList.classList.contains('hidden');
         
         // Hide all other open dropdowns
@@ -91,24 +81,23 @@ $display_name = ($selected_year === 'all') ? 'All Years' : $selected_year;
     }
 
     function handleFilterSelect(year) {
-        // --- MODIFIED: Set loading message for filtering ---
+        // Show loading state before redirect for filtering
         const overlay = document.getElementById('loadingOverlay');
-        const loadingText = document.getElementById('loadingMessageText'); // Get the text element
+        const loadingText = document.getElementById('loadingMessageText');
 
         if (overlay) {
             if (loadingText) {
-                loadingText.textContent = 'Loading Sections...'; // Set the default filter message
+                loadingText.textContent = 'Loading Sections...'; 
             }
-            overlay.classList.remove('hidden');
+            overlay.classList.remove('hidden', 'opacity-0'); 
             // Give a moment for the browser to paint the overlay before redirecting
             setTimeout(() => {
-                overlay.classList.remove('opacity-0');
-            }, 10);
+                window.location.href = 'sections.php?year=' + year;
+            }, 50); 
+        } else {
+            // Fallback
+            window.location.href = 'sections.php?year=' + year;
         }
-        // --- END MODIFIED ---
-        
-        // Perform the redirect/filter action
-        window.location.href = 'sections.php?year=' + year;
     }
 
     // Close dropdown if user clicks outside

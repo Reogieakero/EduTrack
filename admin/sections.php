@@ -119,74 +119,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']) && ($_POST
             $stmt_select->close();
         }
 
-        // 2. Execute DELETE Logic
-        if ($deleted_details) {
-            $sql_delete = "DELETE FROM sections WHERE id = ?";
-            if ($stmt_delete = $conn->prepare($sql_delete)) {
-                $stmt_delete->bind_param("i", $section_id);
-                if ($stmt_delete->execute()) {
-                    // Store structured data for the success modal
-                    $_SESSION['delete_success_details'] = [
-                        'name' => $deleted_details['name'],
-                        'year' => $deleted_details['year'],
-                        'teacher' => $deleted_details['teacher']
-                    ];
-                    header("Location: sections.php");
-                    exit;
-                } else {
-                    $add_error = "ERROR: Could not delete section. " . $stmt_delete->error;
+        // 2. Perform deletion
+        $sql_delete = "DELETE FROM sections WHERE id = ?";
+        if ($stmt_delete = $conn->prepare($sql_delete)) {
+            $stmt_delete->bind_param("i", $section_id);
+            if ($stmt_delete->execute()) {
+                if ($deleted_details) {
+                    $_SESSION['delete_success_details'] = $deleted_details;
                 }
-                $stmt_delete->close();
+                header("Location: sections.php");
+                exit;
+            } else {
+                $add_error = "ERROR: Could not delete the section. " . $stmt_delete->error;
             }
+            $stmt_delete->close();
         } else {
-             $add_error = "ERROR: Section not found for deletion.";
+             $add_error = "ERROR: Could not prepare delete statement. " . $conn->error;
         }
-    }
+    } 
     
-    if ($action_to_perform === 'edit_section' && $section_id > 0) {
-        // --- Fetch data to populate the modal ---
-        $sql = "SELECT id, year, name, teacher FROM sections WHERE id = ?";
-        if ($stmt = $conn->prepare($sql)) {
-            $stmt->bind_param("i", $section_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            if ($row = $result->fetch_assoc()) {
-                // Store the entire section data in a session variable
-                $_SESSION['section_to_edit'] = $row;
+    // ACTION: Edit button clicked (fetch data for modal)
+    else if ($action_to_perform === 'edit_section' && $section_id > 0) {
+        $sql_fetch_edit = "SELECT id, year, name, teacher FROM sections WHERE id = ?";
+        if ($stmt_fetch_edit = $conn->prepare($sql_fetch_edit)) {
+            $stmt_fetch_edit->bind_param("i", $section_id);
+            if ($stmt_fetch_edit->execute()) {
+                $result_edit = $stmt_fetch_edit->get_result();
+                $section_to_edit = $result_edit->fetch_assoc();
+                
+                // Store data in session to be picked up on redirect
+                if ($section_to_edit) {
+                    $_SESSION['section_to_edit'] = $section_to_edit;
+                }
+                header("Location: sections.php");
+                exit;
             }
-            $stmt->close();
+            $stmt_fetch_edit->close();
         }
-        // Redirect to clean the POST and trigger the modal via JS
-        header("Location: sections.php");
-        exit;
     }
 
-    if ($action_to_perform === 'update_section' && $section_id > 0) {
-        // --- Execute UPDATE Logic (triggered by the edit modal form) ---
+    // ACTION: Update button clicked (save changes from modal)
+    else if ($action_to_perform === 'update_section' && $section_id > 0) {
         $updated_name = trim($_POST['edit_section_name'] ?? '');
         $updated_teacher = trim($_POST['edit_teacher_name'] ?? '');
         $updated_year = trim($_POST['edit_section_year'] ?? '');
 
         if (!empty($updated_name) && !empty($updated_teacher) && !empty($updated_year)) {
-             $sql = "UPDATE sections SET year = ?, name = ?, teacher = ? WHERE id = ?";
-             if ($stmt = $conn->prepare($sql)) {
-                 $stmt->bind_param("sssi", $updated_year, $updated_name, $updated_teacher, $section_id);
-                 if ($stmt->execute()) {
-                     // Store structured data for the success modal
-                     $_SESSION['edit_success_details'] = [
-                         'name' => $updated_name,
-                         'year' => $updated_year,
-                         'teacher' => $updated_teacher
-                     ];
-                     header("Location: sections.php");
-                     exit;
-                 } else {
-                     $add_error = "ERROR: Could not update section. " . $stmt->error;
-                 }
-                 $stmt->close();
-             }
+            $sql_update = "UPDATE sections SET name = ?, teacher = ?, year = ? WHERE id = ?";
+            if ($stmt_update = $conn->prepare($sql_update)) {
+                $stmt_update->bind_param("sssi", $updated_name, $updated_teacher, $updated_year, $section_id);
+                if ($stmt_update->execute()) {
+                    // Set success details for success modal
+                    $_SESSION['edit_success_details'] = [
+                        'name' => $updated_name,
+                        'year' => $updated_year,
+                        'teacher' => $updated_teacher
+                    ];
+                    header("Location: sections.php");
+                    exit;
+                } else {
+                    $add_error = "ERROR: Could not execute the update statement. " . $stmt_update->error;
+                }
+                $stmt_update->close();
+            } else {
+                $add_error = "ERROR: Could not prepare update statement. " . $conn->error;
+            }
         } else {
-            $add_error = "ERROR: All fields are required for section update.";
+            $add_error = "All fields are required for section update.";
         }
     }
 }
@@ -207,7 +206,6 @@ if ($selected_year !== 'all') {
 
 $sql_fetch .= $where_clause . " ORDER BY created_at DESC, year ASC, name ASC";
 
-
 if ($stmt = $conn->prepare($sql_fetch)) {
     if (!empty($params)) {
         // Use call_user_func_array for dynamic parameter binding
@@ -215,26 +213,24 @@ if ($stmt = $conn->prepare($sql_fetch)) {
         for ($i=0; $i<count($params); $i++) {
             $bind_names[] = &$params[$i];
         }
+        // $stmt->bind_param requires reference for each parameter
         call_user_func_array([$stmt, 'bind_param'], $bind_names);
     }
-    
+
     if ($stmt->execute()) {
         $result = $stmt->get_result();
         if ($result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
-                $sections[] = [
-                    'id' => $row['id'],
-                    'year' => $row['year'],
-                    'name' => $row['name'],
-                    'teacher' => $row['teacher'],
-                    'created_at' => $row['created_at'], 
-                    'students' => [] // Mocked student data
-                ];
+                // NOTE: Students are not fetched here for simplicity, 
+                // but the section_card.php expects $section['students'] to be an array
+                $row['students'] = []; // Placeholder for student data
+                $sections[] = $row;
             }
         }
     } else {
         $fetch_error = "ERROR: Could not execute the fetch statement. " . $stmt->error;
     }
+
     $stmt->close();
 } else {
     $fetch_error = "ERROR: Could not prepare the fetch statement. " . $conn->error;
@@ -255,6 +251,23 @@ if (isset($conn)) {
 <title>Section Management</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
+<style>
+/* Custom scrollbar for section_card - can be moved to a CSS file if needed */
+.custom-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+.custom-scroll::-webkit-scrollbar-track {
+    background: #f8f9fb;
+    border-radius: 10px;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+    background: #D1D5DB;
+    border-radius: 10px;
+}
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+    background: #9CA3AF;
+}
+</style>
 <script>
 tailwind.config = {
     theme: {
@@ -315,7 +328,10 @@ include 'components/sidebar.php';
                 <span>All Sections (<?php echo count($sections); ?>)</span>
             </h2>
 
-            <?php include 'components/year_filter.php'; ?>
+            <?php 
+            // NOTE: This component handles filter redirection logic and can optionally show the loading overlay
+            include 'components/year_filter.php'; 
+            ?>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -338,7 +354,7 @@ include 'components/sidebar.php';
 </main>
 
 <?php 
-// NOTE: These files must exist in their respective paths
+// Modals remain at the end of the body
 include 'components/add_section_modal.php'; 
 include 'components/success_modal.php'; 
 include 'components/edit_section_modal.php'; 
@@ -350,285 +366,14 @@ $edit_success_json = json_encode($edit_success_details);
 $delete_success_json = json_encode($delete_success_details); 
 $edit_data_json = json_encode($section_to_edit); 
 
+// PHP Echoes the data variables for the external JS file to read
 echo "<script>const successDetails = {$success_json};</script>";
 echo "<script>const editSuccessDetails = {$edit_success_json};</script>"; 
 echo "<script>const deleteSuccessDetails = {$delete_success_json};</script>"; 
 echo "<script>const sectionToEdit = {$edit_data_json};</script>";
 ?>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    lucide.createIcons();
+<script src="js/section-management.js"></script>
 
-    // --- Loading Overlay Fix/Cleanup ---
-    const overlay = document.getElementById('loadingOverlay');
-    if (overlay && !overlay.classList.contains('hidden')) {
-        overlay.classList.add('opacity-0');
-        setTimeout(() => {
-            overlay.classList.add('hidden');
-        }, 300);
-    }
-    // --- END Loading Overlay Fix/Cleanup ---
-
-    // --- Modal Elements ---
-    const modal = document.getElementById('addSectionModal');
-    const modalContent = document.getElementById('modalContent');
-    const openBtn = document.getElementById('openModalBtn');
-    const closeBtn = document.getElementById('closeModalBtn');
-    
-    const successModal = document.getElementById('successModal');
-    const successModalContent = document.getElementById('successModalContent');
-    const closeSuccessModalBtn = document.getElementById('closeSuccessModalBtn');
-
-    const addSectionForm = document.getElementById('addSectionForm');
-    const saveSectionBtn = document.getElementById('saveSectionBtn');
-    const saveIcon = document.getElementById('saveIcon');
-    const saveText = document.getElementById('saveText');
-    const loadingSpinner = document.getElementById('loadingSpinner');
-
-    // --- EDIT MODAL ELEMENTS ---
-    const editModal = document.getElementById('editSectionModal');
-    const editModalContent = document.getElementById('editModalContent');
-    const closeEditModalBtn = document.getElementById('closeEditModalBtn');
-    const editForm = document.getElementById('editSectionForm');
-    const editSectionIdInput = document.getElementById('edit_section_id');
-    const editSectionNameInput = document.getElementById('edit_modal_section_name');
-    const editTeacherNameInput = document.getElementById('edit_modal_teacher_name');
-    const editYearRadios = document.getElementsByName('edit_section_year');
-
-    // --- DELETE MODAL ELEMENTS ---
-    const deleteModal = document.getElementById('deleteConfirmationModal');
-    const deleteModalContent = document.getElementById('deleteModalContent');
-    const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
-    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-    const deleteSectionNameSpan = document.getElementById('deleteSectionName');
-    
-    // --- LOADING TEXT ELEMENT ---
-    const loadingMessageText = document.getElementById('loadingMessageText');
-
-    // --- SUCCESS DESCRIPTION ELEMENT (NEW) ---
-    const successModalDescription = document.getElementById('success-modal-description');
-
-
-    // --- Generic Modal Functions ---
-    const openModal = (targetModal, targetContent) => {
-        targetModal.classList.remove('hidden');
-        setTimeout(() => {
-            targetModal.classList.remove('opacity-0');
-            targetContent.classList.remove('scale-95', 'opacity-0');
-            targetContent.classList.add('scale-100', 'opacity-100');
-            document.body.style.overflow = 'hidden'; 
-        }, 10);
-    };
-
-    const closeModal = (targetModal, targetContent) => {
-        targetContent.classList.remove('scale-100', 'opacity-100');
-        targetContent.classList.add('scale-95', 'opacity-0');
-        targetModal.classList.add('opacity-0');
-        
-        setTimeout(() => {
-            targetModal.classList.add('hidden');
-            // Check all modals before resetting overflow (UPDATED CHECK)
-            if(modal.classList.contains('hidden') && successModal.classList.contains('hidden') && editModal.classList.contains('hidden') && deleteModal.classList.contains('hidden')) {
-                document.body.style.overflow = '';
-            }
-        }, 300); 
-    };
-
-    // Function to trigger the PHP edit action 
-    window.initiateEditAction = function(sectionId) {
-        // ... (Code to submit edit action)
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = 'sections.php';
-
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'edit_section'; 
-        form.appendChild(actionInput);
-
-        const idInput = document.createElement('input');
-        idInput.type = 'hidden';
-        idInput.name = 'section_id';
-        idInput.value = sectionId;
-        form.appendChild(idInput);
-
-        document.body.appendChild(form);
-        form.submit();
-    };
-
-    // Function to open the confirmation modal 
-    window.confirmDeleteAction = function(sectionId, sectionName) {
-        deleteSectionNameSpan.textContent = sectionName;
-        confirmDeleteBtn.setAttribute('data-section-id', sectionId);
-        openModal(deleteModal, deleteModalContent);
-    };
-
-    // Function to execute the delete after confirmation (shows overlay)
-    window.executeDeleteAction = function(sectionId) {
-        // 1. Hide the confirmation modal
-        closeModal(deleteModal, deleteModalContent);
-
-        // 2. Show the loading overlay 
-        if (overlay) {
-            // Set the message specifically for deletion
-            if (loadingMessageText) {
-                loadingMessageText.textContent = 'Deleting Section...'; 
-            }
-            
-            overlay.classList.remove('hidden', 'opacity-0');
-            setTimeout(() => {
-                 overlay.classList.add('opacity-100');
-            }, 10);
-        }
-
-        // 3. Create a temporary form to submit the delete action
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = 'sections.php';
-
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'delete_section';
-        form.appendChild(actionInput);
-
-        const idInput = document.createElement('input');
-        idInput.type = 'hidden';
-        idInput.name = 'section_id';
-        idInput.value = sectionId;
-        form.appendChild(idInput);
-
-        document.body.appendChild(form);
-        form.submit();
-    };
-    
-    // --- EDIT MODAL POPULATION & TRIGGER ---
-    if (sectionToEdit) {
-        // 1. Populate the form fields
-        editSectionIdInput.value = sectionToEdit.id;
-        editSectionNameInput.value = sectionToEdit.name;
-        editTeacherNameInput.value = sectionToEdit.teacher;
-
-        // 2. Select the correct radio button for the year
-        editYearRadios.forEach(radio => {
-            if (radio.value === sectionToEdit.year) {
-                radio.checked = true;
-            } else {
-                radio.checked = false;
-            }
-        });
-
-        // 3. Open the edit modal
-        openModal(editModal, editModalContent);
-    }
-    
-    // --- Event Listeners ---
-    openBtn.addEventListener('click', () => openModal(modal, modalContent));
-    closeBtn.addEventListener('click', () => closeModal(modal, modalContent));
-    closeSuccessModalBtn.addEventListener('click', () => closeModal(successModal, successModalContent));
-    closeEditModalBtn.addEventListener('click', () => closeModal(editModal, editModalContent)); 
-    
-    // Delete Modal Listeners
-    cancelDeleteBtn.addEventListener('click', () => closeModal(deleteModal, deleteModalContent));
-    confirmDeleteBtn.addEventListener('click', function() {
-        const sectionId = this.getAttribute('data-section-id');
-        if (sectionId) {
-            executeDeleteAction(sectionId);
-        }
-    });
-
-
-    // Modal click-off handlers
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) { closeModal(modal, modalContent); }
-    });
-    successModal.addEventListener('click', (e) => {
-        if (e.target === successModal) { closeModal(successModal, successModalContent); }
-    });
-    editModal.addEventListener('click', (e) => { 
-        if (e.target === editModal) { closeModal(editModal, editModalContent); }
-    });
-    deleteModal.addEventListener('click', (e) => { 
-        if (e.target === deleteModal) { closeModal(deleteModal, deleteModalContent); }
-    });
-    
-    // Custom scrollbar CSS injection for better UI
-    const style = document.createElement('style');
-    style.innerHTML = `
-    .custom-scroll::-webkit-scrollbar {
-        width: 6px;
-    }
-    .custom-scroll::-webkit-scrollbar-track {
-        background: #f8f9fb;
-        border-radius: 10px;
-    }
-    .custom-scroll::-webkit-scrollbar-thumb {
-        background: #D1D5DB;
-        border-radius: 10px;
-    }
-    .custom-scroll::-webkit-scrollbar-thumb:hover {
-        background: #9CA3AF;
-    }
-    `;
-    document.head.appendChild(style);
-
-    // --- Add/Update/Delete Success Logic (MODIFIED to handle dynamic descriptions) ---
-    let detailsToShow = null;
-    let modalTitle = '';
-    let modalDescription = ''; 
-    
-    // Check for ADD success 
-    if (successDetails && successDetails.name) {
-        detailsToShow = successDetails;
-        modalTitle = 'Section Added Successfully!';
-        modalDescription = 'The new section has been saved to the database.';
-    } 
-    // Check for EDIT success
-    else if (editSuccessDetails && editSuccessDetails.name) {
-        detailsToShow = editSuccessDetails;
-        modalTitle = 'Section Updated Successfully!';
-        modalDescription = 'The section details have been successfully updated.';
-    }
-    // Check for DELETE success
-    else if (deleteSuccessDetails && deleteSuccessDetails.name) {
-        detailsToShow = deleteSuccessDetails;
-        modalTitle = 'Section Deleted Successfully!';
-        modalDescription = 'The section was permanently removed from the system.'; // Correct delete message
-    }
-
-
-    if (detailsToShow) {
-        // 1. Update the success modal's dynamic content
-        document.getElementById('success-modal-title').textContent = modalTitle;
-        
-        if (successModalDescription) {
-            successModalDescription.textContent = modalDescription; // Set the correct description text
-        }
-
-        document.getElementById('modalSectionName').textContent = detailsToShow.name;
-        document.getElementById('modalSectionYear').textContent = detailsToShow.year;
-        document.getElementById('modalTeacherName').textContent = detailsToShow.teacher;
-        
-        // 2. Reset the form and button/spinner state for the ADD modal only
-        if (addSectionForm) {
-            addSectionForm.reset(); 
-
-            // Reset loading state for the button in the 'add section' modal
-            if(saveIcon && saveText && loadingSpinner && saveSectionBtn) {
-                saveIcon.classList.remove('hidden');
-                saveText.textContent = 'Save Section';
-                loadingSpinner.classList.add('hidden');
-                saveSectionBtn.disabled = false;
-                saveSectionBtn.classList.add('hover:bg-blue-700');
-                saveSectionBtn.classList.remove('opacity-70', 'cursor-not-allowed');
-            }
-        }
-
-        openModal(successModal, successModalContent);
-    }
-});
-</script>
 </body>
 </html>

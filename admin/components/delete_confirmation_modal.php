@@ -18,7 +18,7 @@
                 <button id="cancelDeleteBtn" class="w-1/2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2.5 px-4 rounded-lg transition duration-150">
                     Cancel
                 </button>
-                <button id="confirmDeleteBtn" data-section-id="" class="w-1/2 bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-150">
+                <button id="confirmDeleteBtn" data-section-id="" class="w-1/2 bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-150 shadow-md">
                     Yes, Delete
                 </button>
             </div>
