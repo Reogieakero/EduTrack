@@ -11,7 +11,7 @@
                 </button>
             </div>
             
-            <form method="POST" action="sections.php" class="space-y-5 pt-6">
+            <form method="POST" action="sections.php" class="space-y-5 pt-6" id="addSectionForm">
                 <input type="hidden" name="action" value="add_section">
 
                 <div>
@@ -40,12 +40,42 @@
                 </div>
 
                 <div class="pt-4 border-t flex justify-end">
-                    <button type="submit" class="w-full sm:w-auto bg-primary-blue hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-lg transition duration-150 shadow-md flex items-center justify-center space-x-2">
-                        <i data-lucide="save" class="w-5 h-5"></i>
-                        <span>Save Section</span>
+                    <button type="submit" id="saveSectionBtn" class="w-full sm:w-auto bg-primary-blue hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-lg transition duration-150 shadow-md flex items-center justify-center space-x-2">
+                        <i data-lucide="save" class="w-5 h-5" id="saveIcon"></i>
+                        <span id="saveText">Save Section</span>
+                        <svg id="loadingSpinner" class="animate-spin h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
                     </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+    // This script should be added within sections.php document.addEventListener('DOMContentLoaded', ...) block
+    document.addEventListener('DOMContentLoaded', function() {
+        const addSectionForm = document.getElementById('addSectionForm');
+        const saveSectionBtn = document.getElementById('saveSectionBtn');
+        const saveIcon = document.getElementById('saveIcon');
+        const saveText = document.getElementById('saveText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+
+        if (addSectionForm) {
+            addSectionForm.addEventListener('submit', function(event) {
+                // Check if all required fields are filled before showing spinner
+                if (addSectionForm.checkValidity()) {
+                    // Show loading state
+                    saveIcon.classList.add('hidden');
+                    saveText.textContent = 'Saving...';
+                    loadingSpinner.classList.remove('hidden');
+                    saveSectionBtn.disabled = true; // Prevent multiple submissions
+                    saveSectionBtn.classList.remove('hover:bg-blue-700');
+                    saveSectionBtn.classList.add('opacity-70', 'cursor-not-allowed');
+                }
+            });
+        }
+    });
+</script>

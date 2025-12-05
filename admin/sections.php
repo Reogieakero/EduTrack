@@ -8,12 +8,12 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 
 require_once '../config/database.php';
 
-if (isset($_SESSION['add_success'])) {
-    $add_success = $_SESSION['add_success'];
-    unset($_SESSION['add_success']); 
-} else {
-    $add_success = false;
-}
+// Check for and retrieve success details (for the pop-up modal)
+$add_success_details = null;
+if (isset($_SESSION['add_success_details'])) {
+    $add_success_details = $_SESSION['add_success_details'];
+    unset($_SESSION['add_success_details']); // Remove the session data after fetching it
+} 
 
 $current_user = htmlspecialchars($_SESSION['username'] ?? 'Admin User'); 
 
@@ -39,7 +39,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $param_teacher = $new_teacher_name;
             
             if ($stmt->execute()) {
-                $_SESSION['add_success'] = "New section '{$new_section_name}' ({$new_section_year}) assigned to {$new_teacher_name} has been added and **SAVED TO THE DATABASE**.";
+                // Store section details for success modal display after redirect
+                $_SESSION['add_success_details'] = [
+                    'name' => $new_section_name,
+                    'year' => $new_section_year,
+                    'teacher' => $new_teacher_name
+                ];
                 header("Location: sections.php");
                 exit;
             } else {
@@ -120,13 +125,6 @@ include 'components/sidebar.php';
         </button>
     </header>
 
-    <?php if ($add_success): ?>
-        <div class="mb-6 p-4 rounded-lg bg-green-50 border border-green-200 text-green-700 flex items-center space-x-2 shadow-sm" role="alert">
-            <i data-lucide="check-circle" class="w-5 h-5 flex-shrink-0"></i>
-            <span><?php echo $add_success; ?></span>
-        </div>
-    <?php endif; ?>
-
     <?php if ($add_error || $fetch_error): ?>
         <div class="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 flex items-center space-x-2 shadow-sm" role="alert">
             <i data-lucide="alert-triangle" class="w-5 h-5 flex-shrink-0"></i>
@@ -206,48 +204,109 @@ include 'components/sidebar.php';
 </main>
 
 <?php 
+// Include both modals
 include 'components/add_section_modal.php'; 
+include 'components/success_modal.php'; 
+
+// Pass success data to JavaScript
+$success_json = json_encode($add_success_details);
+echo "<script>const successDetails = {$success_json};</script>";
 ?>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     lucide.createIcons();
 
+    // Section Creation Modal Elements
     const modal = document.getElementById('addSectionModal');
     const modalContent = document.getElementById('modalContent');
     const openBtn = document.getElementById('openModalBtn');
     const closeBtn = document.getElementById('closeModalBtn');
+    
+    // Success Modal Elements
+    const successModal = document.getElementById('successModal');
+    const successModalContent = document.getElementById('successModalContent');
+    const closeSuccessModalBtn = document.getElementById('closeSuccessModalBtn');
+    const modalSectionName = document.getElementById('modalSectionName');
+    const modalSectionYear = document.getElementById('modalSectionYear');
+    const modalTeacherName = document.getElementById('modalTeacherName');
 
-    const openModal = () => {
-        modal.classList.remove('hidden');
+    // Loading/Save Button Elements
+    const addSectionForm = document.getElementById('addSectionForm');
+    const saveSectionBtn = document.getElementById('saveSectionBtn');
+    const saveIcon = document.getElementById('saveIcon');
+    const saveText = document.getElementById('saveText');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+
+    // Generic Modal Functions
+    const openModal = (targetModal, targetContent) => {
+        targetModal.classList.remove('hidden');
         setTimeout(() => {
-            modal.classList.remove('opacity-0');
-            modalContent.classList.remove('scale-95', 'opacity-0');
-            modalContent.classList.add('scale-100', 'opacity-100');
+            targetModal.classList.remove('opacity-0');
+            targetContent.classList.remove('scale-95', 'opacity-0');
+            targetContent.classList.add('scale-100', 'opacity-100');
             document.body.style.overflow = 'hidden'; 
         }, 10);
     };
 
-    const closeModal = () => {
-        modalContent.classList.remove('scale-100', 'opacity-100');
-        modalContent.classList.add('scale-95', 'opacity-0');
-        modal.classList.add('opacity-0');
+    const closeModal = (targetModal, targetContent) => {
+        targetContent.classList.remove('scale-100', 'opacity-100');
+        targetContent.classList.add('scale-95', 'opacity-0');
+        targetModal.classList.add('opacity-0');
         
         setTimeout(() => {
-            modal.classList.add('hidden');
-            document.body.style.overflow = '';
+            targetModal.classList.add('hidden');
+            // Only unlock scroll if no other modals are open
+            if(modal.classList.contains('hidden') && successModal.classList.contains('hidden')) {
+                document.body.style.overflow = '';
+            }
         }, 300); 
     };
 
-    openBtn.addEventListener('click', openModal);
-    closeBtn.addEventListener('click', closeModal);
-
+    // Event Listeners for Section Creation Modal
+    openBtn.addEventListener('click', () => openModal(modal, modalContent));
+    closeBtn.addEventListener('click', () => closeModal(modal, modalContent));
+    
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
-            closeModal();
+            closeModal(modal, modalContent);
         }
     });
+
+    // Event Listeners for Success Modal
+    closeSuccessModalBtn.addEventListener('click', () => closeModal(successModal, successModalContent));
+
+    successModal.addEventListener('click', (e) => {
+        if (e.target === successModal) {
+            closeModal(successModal, successModalContent);
+        }
+    });
+
+    // Loading Animation Handler (Triggered on form submit)
+    if (addSectionForm) {
+        addSectionForm.addEventListener('submit', function(event) {
+            // Check if all required fields are filled before showing spinner
+            if (addSectionForm.checkValidity()) {
+                // Show loading state
+                saveIcon.classList.add('hidden');
+                saveText.textContent = 'Saving...';
+                loadingSpinner.classList.remove('hidden');
+                saveSectionBtn.disabled = true; // Prevent multiple submissions
+                saveSectionBtn.classList.remove('hover:bg-blue-700');
+                saveSectionBtn.classList.add('opacity-70', 'cursor-not-allowed');
+            }
+        });
+    }
+
+    // Display the success modal if successDetails are present (after redirect)
+    if (successDetails) {
+        modalSectionName.textContent = successDetails.name;
+        modalSectionYear.textContent = successDetails.year;
+        modalTeacherName.textContent = successDetails.teacher;
+        openModal(successModal, successModalContent);
+    }
     
+    // Custom scrollbar styling
     const style = document.createElement('style');
     style.innerHTML = `
     .custom-scroll::-webkit-scrollbar {
