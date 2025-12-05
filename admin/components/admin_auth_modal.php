@@ -60,11 +60,7 @@
 
 
 <script>
-/* =========================
-   Open Modal Function
-========================= */
 function openAdminAuthModal(action, sectionName, sectionId) {
-    // Set dynamic values
     document.getElementById("authActionText").textContent = action;
     document.getElementById("authSectionName").textContent = sectionName;
     document.getElementById("authSectionId").textContent = sectionId;
@@ -83,9 +79,6 @@ function openAdminAuthModal(action, sectionName, sectionId) {
     }, 30);
 }
 
-/* =========================
-   Close Modal Function
-========================= */
 function closeAdminAuthModal() {
     const overlay = document.getElementById("adminAuthModal");
     const modal = document.getElementById("adminAuthModalContent");
@@ -101,9 +94,6 @@ function closeAdminAuthModal() {
 document.getElementById("closeAdminAuthModalBtn").onclick = closeAdminAuthModal;
 
 
-/* =========================
-   SUBMIT LOADING EFFECT
-========================= */
 document.getElementById("adminAuthForm").addEventListener("submit", function () {
     const btn = document.getElementById("adminAuthSubmitBtn");
     const icon = document.getElementById("authSubmitIcon");

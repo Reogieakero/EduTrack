@@ -1,14 +1,8 @@
 <?php
-// components/year_filter.php
 
-// NOTE: This component assumes $selected_year and $valid_years 
-// are defined in the parent file (sections.php)
-
-// Ensure valid_years is available
 if (!isset($valid_years)) {
     $valid_years = ['all', 'Year 7', 'Year 8', 'Year 9', 'Year 10', 'Year 11', 'Year 12'];
 }
-// Ensure selected_year is set
 if (!isset($selected_year)) {
     $selected_year = 'all';
 }
@@ -57,12 +51,10 @@ $display_name = ($selected_year === 'all') ? 'All Years' : $selected_year;
 </div>
 
 <script>
-    // Component JS for dropdown functionality and filter redirection (must stay here for immediate feedback)
     function toggleYearDropdown(buttonElement) {
         const optionsList = document.getElementById('year-filter-options');
         const isHidden = optionsList.classList.contains('hidden');
         
-        // Hide all other open dropdowns
         document.querySelectorAll('#year-filter-options').forEach(list => {
             if (list !== optionsList) {
                 list.classList.add('hidden');
@@ -70,7 +62,6 @@ $display_name = ($selected_year === 'all') ? 'All Years' : $selected_year;
             }
         });
 
-        // Toggle visibility of the target dropdown
         if (isHidden) {
             optionsList.classList.remove('hidden');
             buttonElement.setAttribute('aria-expanded', 'true');
@@ -81,7 +72,6 @@ $display_name = ($selected_year === 'all') ? 'All Years' : $selected_year;
     }
 
     function handleFilterSelect(year) {
-        // Show loading state before redirect for filtering
         const overlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingMessageText');
 
@@ -90,17 +80,14 @@ $display_name = ($selected_year === 'all') ? 'All Years' : $selected_year;
                 loadingText.textContent = 'Loading Sections...'; 
             }
             overlay.classList.remove('hidden', 'opacity-0'); 
-            // Give a moment for the browser to paint the overlay before redirecting
             setTimeout(() => {
                 window.location.href = 'sections.php?year=' + year;
             }, 50); 
         } else {
-            // Fallback
             window.location.href = 'sections.php?year=' + year;
         }
     }
 
-    // Close dropdown if user clicks outside
     document.addEventListener('click', function(event) {
         const customFilter = document.getElementById('custom-year-filter');
         if (customFilter && !customFilter.contains(event.target)) {

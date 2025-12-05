@@ -6,7 +6,6 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     exit;
 }
 
-// NOTE: Ensure your database connection file is correctly configured and placed.
 require_once '../config/database.php';
 
 $add_success_details = null;
@@ -15,51 +14,40 @@ if (isset($_SESSION['add_success_details'])) {
     unset($_SESSION['add_success_details']); 
 } 
 
-// --- EDIT DATA STORAGE ---
 $section_to_edit = null;
 if (isset($_SESSION['section_to_edit'])) {
     $section_to_edit = $_SESSION['section_to_edit'];
     unset($_SESSION['section_to_edit']);
 }
 
-// --- Session variable for successful UPDATE details ---
 $edit_success_details = null; 
 if (isset($_SESSION['edit_success_details'])) {
     $edit_success_details = $_SESSION['edit_success_details'];
     unset($_SESSION['edit_success_details']);
 }
-// --- Session variable for successful DELETE details ---
 $delete_success_details = null; 
 if (isset($_SESSION['delete_success_details'])) {
     $delete_success_details = $_SESSION['delete_success_details'];
     unset($_SESSION['delete_success_details']);
 }
-// --- END EDIT/DELETE DATA STORAGE ---
 
-// --- REMOVE AUTH ERROR SESSION VARIABLES (Admin Auth Removed) ---
 unset($_SESSION['auth_error']);
 unset($_SESSION['auth_action']);
 unset($_SESSION['auth_section_id']);
-// --- END REMOVE AUTH ERROR SESSION VARIABLES ---
 
 
 $sections = []; 
 $add_error = false;
 $fetch_error = false;
 
-// --- YEAR FILTER LOGIC ---
 $selected_year = $_GET['year'] ?? 'all'; 
 $valid_years = ['all', 'Year 7', 'Year 8', 'Year 9', 'Year 10', 'Year 11', 'Year 12'];
 
-// Sanitize the selected year
 if (!in_array($selected_year, $valid_years)) {
     $selected_year = 'all'; 
 }
-// --- END YEAR FILTER LOGIC ---
 
 
-// --- HANDLE POST REQUEST TO ADD A NEW SECTION ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_section') {
     $new_section_name = trim($_POST['section_name'] ?? '');
     $new_teacher_name = trim($_POST['teacher_name'] ?? '');
     $new_section_year = trim($_POST['section_year'] ?? '');
@@ -67,7 +55,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (empty($new_section_name) || empty($new_teacher_name) || empty($new_section_year)) {
         $add_error = "Section Name, Assigned Teacher, and Academic Year are all required.";
     } else {
-        // Assuming your 'sections' table has a `created_at` column with a default of CURRENT_TIMESTAMP
         $sql = "INSERT INTO sections (year, name, teacher) VALUES (?, ?, ?)";
         
         if ($stmt = $conn->prepare($sql)) {
@@ -95,19 +82,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
     }
 }
-// --- END POST HANDLING (ADD SECTION) ---
 
-// --- HANDLE POST REQUEST TO EDIT/DELETE/UPDATE A SECTION (Auth Removed) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']) && ($_POST['action'] === 'delete_section' || $_POST['action'] === 'edit_section' || $_POST['action'] === 'update_section'))) {
     
     $action_to_perform = $_POST['action'];
     $section_id = (int)($_POST['section_id'] ?? 0);
     
-    // -----------------------------------------------------
-    // 1. Execute Actions
-    // -----------------------------------------------------
     if ($action_to_perform === 'delete_section' && $section_id > 0) {
-        // 1. Fetch details before deletion for success message
         $sql_select = "SELECT year, name, teacher FROM sections WHERE id = ?";
         $deleted_details = null;
 
@@ -119,7 +100,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']) && ($_POST
             $stmt_select->close();
         }
 
-        // 2. Perform deletion
         $sql_delete = "DELETE FROM sections WHERE id = ?";
         if ($stmt_delete = $conn->prepare($sql_delete)) {
             $stmt_delete->bind_param("i", $section_id);
@@ -138,7 +118,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']) && ($_POST
         }
     } 
     
-    // ACTION: Edit button clicked (fetch data for modal)
     else if ($action_to_perform === 'edit_section' && $section_id > 0) {
         $sql_fetch_edit = "SELECT id, year, name, teacher FROM sections WHERE id = ?";
         if ($stmt_fetch_edit = $conn->prepare($sql_fetch_edit)) {
@@ -147,7 +126,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']) && ($_POST
                 $result_edit = $stmt_fetch_edit->get_result();
                 $section_to_edit = $result_edit->fetch_assoc();
                 
-                // Store data in session to be picked up on redirect
                 if ($section_to_edit) {
                     $_SESSION['section_to_edit'] = $section_to_edit;
                 }
@@ -158,7 +136,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']) && ($_POST
         }
     }
 
-    // ACTION: Update button clicked (save changes from modal)
     else if ($action_to_perform === 'update_section' && $section_id > 0) {
         $updated_name = trim($_POST['edit_section_name'] ?? '');
         $updated_teacher = trim($_POST['edit_teacher_name'] ?? '');
@@ -169,7 +146,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']) && ($_POST
             if ($stmt_update = $conn->prepare($sql_update)) {
                 $stmt_update->bind_param("sssi", $updated_name, $updated_teacher, $updated_year, $section_id);
                 if ($stmt_update->execute()) {
-                    // Set success details for success modal
                     $_SESSION['edit_success_details'] = [
                         'name' => $updated_name,
                         'year' => $updated_year,
@@ -189,10 +165,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']) && ($_POST
         }
     }
 }
-// --- END ADMIN ACTION HANDLING ---
 
 
-// --- FETCH ALL SECTIONS (LATEST FIRST) WITH FILTERING ---
 $sql_fetch = "SELECT id, year, name, teacher, created_at FROM sections";
 $where_clause = '';
 $params = [];
@@ -208,12 +182,10 @@ $sql_fetch .= $where_clause . " ORDER BY created_at DESC, year ASC, name ASC";
 
 if ($stmt = $conn->prepare($sql_fetch)) {
     if (!empty($params)) {
-        // Use call_user_func_array for dynamic parameter binding
         $bind_names = [$types];
         for ($i=0; $i<count($params); $i++) {
             $bind_names[] = &$params[$i];
         }
-        // $stmt->bind_param requires reference for each parameter
         call_user_func_array([$stmt, 'bind_param'], $bind_names);
     }
 
@@ -221,9 +193,7 @@ if ($stmt = $conn->prepare($sql_fetch)) {
         $result = $stmt->get_result();
         if ($result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
-                // NOTE: Students are not fetched here for simplicity, 
-                // but the section_card.php expects $section['students'] to be an array
-                $row['students'] = []; // Placeholder for student data
+                $row['students'] = []; 
                 $sections[] = $row;
             }
         }
@@ -236,8 +206,6 @@ if ($stmt = $conn->prepare($sql_fetch)) {
     $fetch_error = "ERROR: Could not prepare the fetch statement. " . $conn->error;
 }
 
-
-// Check if $conn is still open before closing
 if (isset($conn)) {
     $conn->close();
 }
@@ -291,12 +259,10 @@ tailwind.config = {
 <body class="bg-page-bg min-h-screen flex">
 
 <?php 
-// --- COMPONENT: Full-Page Loading Overlay ---
 include 'components/loading_overlay.php'; 
 ?>
 
 <?php 
-// NOTE: These files must exist in their respective paths
 include 'components/sidebar.php'; 
 ?>
 
@@ -329,7 +295,6 @@ include 'components/sidebar.php';
             </h2>
 
             <?php 
-            // NOTE: This component handles filter redirection logic and can optionally show the loading overlay
             include 'components/year_filter.php'; 
             ?>
         </div>
@@ -345,7 +310,6 @@ include 'components/sidebar.php';
             </div>
         <?php else: ?>
             <?php foreach ($sections as $section): 
-                // Assuming 'components/section_card.php' exists
                 include 'components/section_card.php'; 
             endforeach; ?>
         <?php endif; ?>
@@ -354,7 +318,6 @@ include 'components/sidebar.php';
 </main>
 
 <?php 
-// Modals remain at the end of the body
 include 'components/add_section_modal.php'; 
 include 'components/success_modal.php'; 
 include 'components/edit_section_modal.php'; 
@@ -366,7 +329,6 @@ $edit_success_json = json_encode($edit_success_details);
 $delete_success_json = json_encode($delete_success_details); 
 $edit_data_json = json_encode($section_to_edit); 
 
-// PHP Echoes the data variables for the external JS file to read
 echo "<script>const successDetails = {$success_json};</script>";
 echo "<script>const editSuccessDetails = {$edit_success_json};</script>"; 
 echo "<script>const deleteSuccessDetails = {$delete_success_json};</script>"; 

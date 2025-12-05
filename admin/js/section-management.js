@@ -1,8 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Lucide icons
     lucide.createIcons();
 
-    // --- Loading Overlay Fix/Cleanup (Hide it after page load) ---
     const overlay = document.getElementById('loadingOverlay');
     if (overlay && !overlay.classList.contains('hidden')) {
         overlay.classList.add('opacity-0');
@@ -10,9 +8,7 @@ document.addEventListener('DOMContentLoaded', function() {
             overlay.classList.add('hidden');
         }, 300);
     }
-    // --- END Loading Overlay Fix/Cleanup ---
 
-    // --- Modal Elements ---
     const modal = document.getElementById('addSectionModal');
     const modalContent = document.getElementById('modalContent');
     const openBtn = document.getElementById('openModalBtn');
@@ -28,7 +24,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveText = document.getElementById('saveText');
     const loadingSpinner = document.getElementById('loadingSpinner');
 
-    // --- EDIT MODAL ELEMENTS ---
     const editModal = document.getElementById('editSectionModal');
     const editModalContent = document.getElementById('editModalContent');
     const closeEditModalBtn = document.getElementById('closeEditModalBtn');
@@ -42,19 +37,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const updateText = document.getElementById('updateText');
     const updateLoadingSpinner = document.getElementById('updateLoadingSpinner');
 
-    // --- DELETE MODAL ELEMENTS ---
     const deleteModal = document.getElementById('deleteConfirmationModal');
     const deleteModalContent = document.getElementById('deleteModalContent');
     const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
     const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
     const deleteSectionNameSpan = document.getElementById('deleteSectionName');
     
-    // --- LOADING/SUCCESS TEXT ELEMENTS ---
     const loadingMessageText = document.getElementById('loadingMessageText');
     const successModalDescription = document.getElementById('success-modal-description');
 
 
-    // --- Generic Modal Functions ---
     const openModal = (targetModal, targetContent) => {
         targetModal.classList.remove('hidden');
         setTimeout(() => {
@@ -72,18 +64,13 @@ document.addEventListener('DOMContentLoaded', function() {
         
         setTimeout(() => {
             targetModal.classList.add('hidden');
-            // Check all modals before resetting overflow
             if(modal.classList.contains('hidden') && successModal.classList.contains('hidden') && editModal.classList.contains('hidden') && deleteModal.classList.contains('hidden')) {
                 document.body.style.overflow = '';
             }
         }, 300); 
     };
     
-    // --- Exposed Global Functions for Buttons in section_card.php ---
-    
-    // Function to trigger the PHP edit action (page reload)
     window.initiateEditAction = function(sectionId) {
-        // Show loading state before redirect
         if (overlay) {
             if (loadingMessageText) {
                 loadingMessageText.textContent = 'Fetching Section Details...'; 
@@ -112,19 +99,15 @@ document.addEventListener('DOMContentLoaded', function() {
         form.submit();
     };
 
-    // Function to open the confirmation modal 
     window.confirmDeleteAction = function(sectionId, sectionName) {
         deleteSectionNameSpan.textContent = sectionName;
         confirmDeleteBtn.setAttribute('data-section-id', sectionId);
         openModal(deleteModal, deleteModalContent);
     };
 
-    // Function to execute the delete after confirmation (shows overlay and reloads)
     window.executeDeleteAction = function(sectionId) {
-        // 1. Hide the confirmation modal
         closeModal(deleteModal, deleteModalContent);
 
-        // 2. Show the loading overlay 
         if (overlay) {
             if (loadingMessageText) {
                 loadingMessageText.textContent = 'Deleting Section...'; 
@@ -136,7 +119,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 10);
         }
 
-        // 3. Create a temporary form to submit the delete action
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = 'sections.php';
@@ -157,15 +139,11 @@ document.addEventListener('DOMContentLoaded', function() {
         form.submit();
     };
     
-    // --- EDIT MODAL POPULATION & TRIGGER (On Page Load) ---
-    // Note: sectionToEdit variable is echoed in sections.php
     if (typeof sectionToEdit !== 'undefined' && sectionToEdit && sectionToEdit.id) {
-        // 1. Populate the form fields
         editSectionIdInput.value = sectionToEdit.id;
         editSectionNameInput.value = sectionToEdit.name;
         editTeacherNameInput.value = sectionToEdit.teacher;
 
-        // 2. Select the correct radio button for the year
         editYearRadios.forEach(radio => {
             if (radio.value === sectionToEdit.year) {
                 radio.checked = true;
@@ -174,18 +152,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // 3. Open the edit modal
         openModal(editModal, editModalContent);
     }
     
-    // --- Event Listeners ---
     
-    // ADD Modal Listeners
     openBtn.addEventListener('click', () => openModal(modal, modalContent));
     closeBtn.addEventListener('click', () => closeModal(modal, modalContent));
     if (addSectionForm) {
         addSectionForm.addEventListener('submit', function(event) {
-            // Show loading state when submitting the ADD form
             if (addSectionForm.checkValidity()) {
                 saveIcon.classList.add('hidden');
                 saveText.textContent = 'Saving...';
@@ -197,11 +171,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // EDIT Modal Listeners
     closeEditModalBtn.addEventListener('click', () => closeModal(editModal, editModalContent)); 
     if (editForm) {
         editForm.addEventListener('submit', function(event) {
-            // Show loading state when submitting the EDIT form
             if (editForm.checkValidity()) {
                 updateIcon.classList.add('hidden');
                 updateText.textContent = 'Updating...';
@@ -213,7 +185,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // DELETE Modal Listeners
     cancelDeleteBtn.addEventListener('click', () => closeModal(deleteModal, deleteModalContent));
     confirmDeleteBtn.addEventListener('click', function() {
         const sectionId = this.getAttribute('data-section-id');
@@ -222,11 +193,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // SUCCESS Modal Listener
     closeSuccessModalBtn.addEventListener('click', () => closeModal(successModal, successModalContent));
 
-
-    // Modal click-off handlers (Clicking the backdrop closes the modal)
     modal.addEventListener('click', (e) => {
         if (e.target === modal) { closeModal(modal, modalContent); }
     });
@@ -240,24 +208,20 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.target === deleteModal) { closeModal(deleteModal, deleteModalContent); }
     });
     
-    // --- Add/Update/Delete Success Logic (On Page Load) ---
     let detailsToShow = null;
     let modalTitle = '';
     let modalDescription = ''; 
     
-    // Check for ADD success 
     if (typeof successDetails !== 'undefined' && successDetails && successDetails.name) {
         detailsToShow = successDetails;
         modalTitle = 'Section Added Successfully!';
         modalDescription = 'The new section has been saved to the database.';
     } 
-    // Check for EDIT success
     else if (typeof editSuccessDetails !== 'undefined' && editSuccessDetails && editSuccessDetails.name) {
         detailsToShow = editSuccessDetails;
         modalTitle = 'Section Updated Successfully!';
         modalDescription = 'The section details have been successfully updated.';
     }
-    // Check for DELETE success
     else if (typeof deleteSuccessDetails !== 'undefined' && deleteSuccessDetails && deleteSuccessDetails.name) {
         detailsToShow = deleteSuccessDetails;
         modalTitle = 'Section Deleted Successfully!';
@@ -266,7 +230,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     if (detailsToShow) {
-        // 1. Update the success modal's dynamic content
         document.getElementById('success-modal-title').textContent = modalTitle;
         
         if (successModalDescription) {
@@ -277,11 +240,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('modalSectionYear').textContent = detailsToShow.year;
         document.getElementById('modalTeacherName').textContent = detailsToShow.teacher;
         
-        // 2. Open the success modal
         openModal(successModal, successModalContent);
     }
     
-    // Initialize sidebar JS logic after all HTML is loaded (moved from sidebar.php)
     const sidebar = document.getElementById('sidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
@@ -298,7 +259,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const closeSidebar = () => {
             sidebar.classList.add('-translate-x-full');
             sidebarOverlay.classList.add('hidden');
-            // Only restore scroll if no other modal is open
             if(modal.classList.contains('hidden') && successModal.classList.contains('hidden') && editModal.classList.contains('hidden') && deleteModal.classList.contains('hidden')) {
                  document.body.style.overflow = '';
             }
@@ -319,7 +279,6 @@ document.addEventListener('DOMContentLoaded', function() {
             link.addEventListener('click', closeSidebar);
         });
         
-        // Handle main content margin for smaller screens
         const setMainMargin = () => {
             if (window.innerWidth < 768) {
                  if(mainContent) mainContent.style.marginLeft = '4rem';
