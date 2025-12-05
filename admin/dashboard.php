@@ -6,7 +6,6 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     exit;
 }
 
-// Variable required by sidebar.php
 $current_user = htmlspecialchars($_SESSION['username']); 
 ?>
 <!DOCTYPE html>
@@ -29,8 +28,8 @@ $current_user = htmlspecialchars($_SESSION['username']);
                         'page-bg': '#F4F7FF',
                         'secondary-text': '#1F2937', 
                         'sidebar-bg': '#1B3C53',
-                        'sidebar-text': '#E5E7EB', // Gray-200
-                        'active-link': '#10B981', // Emerald-500
+                        'sidebar-text': '#E5E7EB', 
+                        'active-link': '#10B981', 
                     },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
