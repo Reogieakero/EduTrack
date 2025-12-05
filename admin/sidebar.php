@@ -1,9 +1,9 @@
 <?php
-// Note: $current_user must be defined in the calling script (dashboard.php)
 if (!isset($current_user)) {
-    // Fallback or error handling if not set
     $current_user = "Admin User"; 
 }
+
+$current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <aside class="fixed top-0 left-0 w-64 h-full bg-sidebar-bg text-sidebar-text shadow-xl hidden md:flex flex-col z-10">
     
@@ -13,31 +13,40 @@ if (!isset($current_user)) {
     </div>
     
     <nav class="flex-grow p-4 space-y-2">
-        
-        <a href="dashboard.php" class="flex items-center space-x-3 p-3 rounded-lg text-white font-semibold bg-primary-hover transition duration-150">
+        <!-- Dashboard -->
+        <a href="dashboard.php" class="flex items-center space-x-3 p-3 rounded-lg font-semibold transition duration-150
+            <?php echo ($current_page == 'dashboard.php') ? 'bg-white bg-opacity-20 text-white' : 'text-white hover:bg-primary-hover'; ?>">
             <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
             <span>Dashboard</span>
         </a>
 
         <p class="pt-4 pb-2 px-3 text-xs uppercase tracking-widest text-gray-400 font-medium">User Management</p>
 
-        <a href="#" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-primary-hover transition duration-150 group">
-            <i data-lucide="layers" class="w-5 h-5 text-sidebar-text group-hover:text-active-link"></i>
+        <!-- Section -->
+        <a href="sections.php" class="flex items-center space-x-3 p-3 rounded-lg transition duration-150
+            <?php echo ($current_page == 'sections.php') ? 'bg-white bg-opacity-20 text-white' : 'text-white hover:bg-primary-hover'; ?>">
+            <i data-lucide="layers" class="w-5 h-5"></i>
             <span>Section</span>
         </a>
 
-        <a href="#" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-primary-hover transition duration-150 group">
-            <i data-lucide="user-cog" class="w-5 h-5 text-sidebar-text group-hover:text-active-link"></i>
+        <!-- Students -->
+        <a href="students.php" class="flex items-center space-x-3 p-3 rounded-lg transition duration-150
+            <?php echo ($current_page == 'students.php') ? 'bg-white bg-opacity-20 text-white' : 'text-white hover:bg-primary-hover'; ?>">
+            <i data-lucide="user-cog" class="w-5 h-5"></i>
             <span>Students</span>
         </a>
-        
-        <a href="#" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-primary-hover transition duration-150 group">
-            <i data-lucide="users" class="w-5 h-5 text-sidebar-text group-hover:text-active-link"></i>
+
+        <!-- Parents -->
+        <a href="parents.php" class="flex items-center space-x-3 p-3 rounded-lg transition duration-150
+            <?php echo ($current_page == 'parents.php') ? 'bg-white bg-opacity-20 text-white' : 'text-white hover:bg-primary-hover'; ?>">
+            <i data-lucide="users" class="w-5 h-5"></i>
             <span>Parents</span>
         </a>
 
-        <a href="#" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-primary-hover transition duration-150 group">
-            <i data-lucide="graduation-cap" class="w-5 h-5 text-sidebar-text group-hover:text-active-link"></i>
+        <!-- Teachers -->
+        <a href="teachers.php" class="flex items-center space-x-3 p-3 rounded-lg transition duration-150
+            <?php echo ($current_page == 'teachers.php') ? 'bg-white bg-opacity-20 text-white' : 'text-white hover:bg-primary-hover'; ?>">
+            <i data-lucide="graduation-cap" class="w-5 h-5"></i>
             <span>Teachers</span>
         </a>
     </nav>
