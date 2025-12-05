@@ -14,14 +14,24 @@ if (isset($_SESSION['add_success_details'])) {
     unset($_SESSION['add_success_details']); 
 } 
 
+// --- NEW EDIT DATA STORAGE ---
+$section_to_edit = null;
+if (isset($_SESSION['section_to_edit'])) {
+    $section_to_edit = $_SESSION['section_to_edit'];
+    unset($_SESSION['section_to_edit']);
+}
+// --- END NEW EDIT DATA STORAGE ---
+
 $sections = []; 
 $add_error = false;
 $fetch_error = false;
 
+// --- YEAR FILTER LOGIC ---
 $selected_year = $_GET['year'] ?? 'all'; 
+// --- END YEAR FILTER LOGIC ---
 
-$mandatory_grades = ['all', '7', '8', '9', '10', '11', '12'];
 
+// --- HANDLE POST REQUEST TO ADD A NEW SECTION (Remains the same) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_section') {
     $new_section_name = trim($_POST['section_name'] ?? '');
     $new_teacher_name = trim($_POST['teacher_name'] ?? '');
@@ -57,15 +67,113 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
     }
 }
+// --- END POST HANDLING (ADD SECTION) ---
 
-$sql_fetch = "SELECT id, year, name, teacher FROM sections";
+// --- HANDLE POST REQUEST TO EDIT/DELETE A SECTION (Admin Auth) ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']) && ($_POST['action'] === 'delete_section' || $_POST['action'] === 'edit_section' || $_POST['action'] === 'update_section'))) {
+    
+    $action_to_perform = $_POST['action'];
+    $section_id = (int)($_POST['section_id'] ?? 0);
+    $admin_password_input = $_POST['admin_password'] ?? '';
+    
+    $ADMIN_PASS = "admin123"; // ⚠️ HARDCODED FOR DEMO ⚠️
+
+    // -----------------------------------------------------
+    // 1. Admin Password Check (only for delete/edit triggers)
+    // -----------------------------------------------------
+    if ($action_to_perform === 'delete_section' || $action_to_perform === 'edit_section') {
+        if ($admin_password_input !== $ADMIN_PASS) {
+            $_SESSION['auth_error'] = "Authentication failed. Incorrect Admin Password.";
+            $_SESSION['auth_action'] = $action_to_perform; 
+            $_SESSION['auth_section_id'] = $section_id;
+            header("Location: sections.php");
+            exit;
+        }
+    }
+
+    // -----------------------------------------------------
+    // 2. Execute Actions after successful auth
+    // -----------------------------------------------------
+    if ($action_to_perform === 'delete_section' && $section_id > 0) {
+        // --- Execute DELETE Logic ---
+        $sql = "DELETE FROM sections WHERE id = ?";
+        if ($stmt = $conn->prepare($sql)) {
+            $stmt->bind_param("i", $section_id);
+            if ($stmt->execute()) {
+                $_SESSION['delete_success'] = "Section ID {$section_id} successfully deleted.";
+                header("Location: sections.php");
+                exit;
+            } else {
+                $add_error = "ERROR: Could not delete section. " . $stmt->error;
+            }
+            $stmt->close();
+        }
+    }
+    
+    if ($action_to_perform === 'edit_section' && $section_id > 0) {
+        // --- AUTHENTICATION SUCCESS: Fetch data to populate the modal ---
+        $sql = "SELECT id, year, name, teacher FROM sections WHERE id = ?";
+        if ($stmt = $conn->prepare($sql)) {
+            $stmt->bind_param("i", $section_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($row = $result->fetch_assoc()) {
+                // Store the entire section data in a session variable
+                $_SESSION['section_to_edit'] = $row;
+            }
+            $stmt->close();
+        }
+        // Redirect to clean the POST and trigger the modal via JS
+        header("Location: sections.php");
+        exit;
+    }
+
+    if ($action_to_perform === 'update_section' && $section_id > 0) {
+        // --- Execute UPDATE Logic (triggered by the edit modal form) ---
+        $updated_name = trim($_POST['edit_section_name'] ?? '');
+        $updated_teacher = trim($_POST['edit_teacher_name'] ?? '');
+        $updated_year = trim($_POST['edit_section_year'] ?? '');
+
+        if (!empty($updated_name) && !empty($updated_teacher) && !empty($updated_year)) {
+             $sql = "UPDATE sections SET year = ?, name = ?, teacher = ? WHERE id = ?";
+             if ($stmt = $conn->prepare($sql)) {
+                $stmt->bind_param("sssi", $updated_year, $updated_name, $updated_teacher, $section_id);
+                if ($stmt->execute()) {
+                    $_SESSION['edit_success'] = "Section {$updated_name} (ID: {$section_id}) successfully updated.";
+                    header("Location: sections.php");
+                    exit;
+                } else {
+                    $add_error = "ERROR: Could not update section. " . $stmt->error;
+                }
+                $stmt->close();
+            }
+        } else {
+            $add_error = "ERROR: All fields are required for section update.";
+        }
+    }
+}
+// --- END ADMIN ACTION HANDLING ---
+
+
+// --- FETCH ALL SECTIONS (WITH FILTER) ---
+// 1. Fetch available years for the filter buttons
+$sql_fetch = "SELECT DISTINCT year FROM sections ORDER BY year ASC";
+$years = ['all']; 
+if ($result_years = $conn->query($sql_fetch)) {
+    while ($row = $result_years->fetch_assoc()) {
+        $years[] = htmlspecialchars($row['year']);
+    }
+}
+
+// 2. Fetch sections based on the selected year
+$sql_fetch = "SELECT id, year, name, teacher, created_at FROM sections";
 $where_clause = "";
 
 if ($selected_year !== 'all') {
     $where_clause = " WHERE year = '" . $conn->real_escape_string($selected_year) . "'";
 }
 
-$sql_fetch .= $where_clause . " ORDER BY year DESC, name ASC";
+$sql_fetch .= $where_clause . " ORDER BY year ASC, name ASC";
 
 if ($result = $conn->query($sql_fetch)) {
     if ($result->num_rows > 0) {
@@ -75,7 +183,8 @@ if ($result = $conn->query($sql_fetch)) {
                 'year' => $row['year'],
                 'name' => $row['name'],
                 'teacher' => $row['teacher'],
-                'students' => [] 
+                'created_at' => $row['created_at'], 
+                'students' => [] // Mocked student data
             ];
         }
     }
@@ -140,24 +249,42 @@ include 'components/sidebar.php';
         </div>
     <?php endif; ?>
 
+    <?php if (isset($_SESSION['delete_success'])): ?>
+        <div class="mb-6 p-4 rounded-lg bg-green-50 border border-green-200 text-green-700 flex items-center space-x-2 shadow-sm" role="alert">
+            <i data-lucide="check-circle" class="w-5 h-5 flex-shrink-0"></i>
+            <span><?php echo $_SESSION['delete_success']; ?></span>
+        </div>
+    <?php unset($_SESSION['delete_success']); endif; ?>
+    
+    <?php if (isset($_SESSION['edit_success'])): ?>
+        <div class="mb-6 p-4 rounded-lg bg-green-50 border border-green-200 text-green-700 flex items-center space-x-2 shadow-sm" role="alert">
+            <i data-lucide="check-circle" class="w-5 h-5 flex-shrink-0"></i>
+            <span><?php echo $_SESSION['edit_success']; ?></span>
+        </div>
+    <?php unset($_SESSION['edit_success']); endif; ?>
+
+
     <div class="lg:col-span-3">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
             <h2 class="text-3xl font-bold text-gray-800 flex items-center space-x-2 mb-4 sm:mb-0">
                 <i data-lucide="layers" class="w-7 h-7 text-gray-600"></i>
-                <span>Sections (<?php echo count($sections); ?>)</span>
+                <span>All Sections (<?php echo count($sections); ?>)</span>
             </h2>
 
             <div class="flex space-x-2 p-1 bg-gray-100 rounded-xl shadow-inner overflow-x-auto">
+                <?php 
+                $year_tabs = array_unique($years); 
+                ?>
                 
-                <?php foreach ($mandatory_grades as $year_option): 
+                <?php foreach ($year_tabs as $year_option): 
                     $is_selected = $selected_year === $year_option;
-                    $display_text = $year_option === 'all' ? 'All Grades' : 'Grade ' . $year_option;
+                    $display_text = $year_option === 'all' ? 'All Years' : $year_option;
                     $class = $is_selected 
                         ? 'bg-white text-primary-blue font-bold shadow-md' 
                         : 'text-gray-600 hover:bg-gray-200';
                 ?>
                     <a href="sections.php?year=<?php echo $year_option; ?>" 
-                       class="px-4 py-2 text-sm rounded-lg transition duration-150 whitespace-nowrap <?php echo $class; ?>">
+                        class="px-4 py-2 text-sm rounded-lg transition duration-150 whitespace-nowrap <?php echo $class; ?>">
                         <?php echo $display_text; ?>
                     </a>
                 <?php endforeach; ?>
@@ -171,7 +298,7 @@ include 'components/sidebar.php';
                 <h3 class="text-xl font-semibold text-gray-800">No Sections Found</h3>
                 <p class="text-gray-500 mt-2">
                     <?php if ($selected_year !== 'all'): ?>
-                        No sections found for Grade <?php echo htmlspecialchars($selected_year); ?>.
+                        No sections found for academic year **<?php echo htmlspecialchars($selected_year); ?>**.
                     <?php else: ?>
                         Click the "Add New Section" button above to create your first section.
                     <?php endif; ?>
@@ -189,15 +316,22 @@ include 'components/sidebar.php';
 <?php 
 include 'components/add_section_modal.php'; 
 include 'components/success_modal.php'; 
+include 'components/admin_auth_modal.php'; 
+// --- NEW EDIT MODAL INCLUDE ---
+include 'components/edit_section_modal.php'; 
+
 
 $success_json = json_encode($add_success_details);
+$edit_data_json = json_encode($section_to_edit); // Pass fetched data to JS
 echo "<script>const successDetails = {$success_json};</script>";
+echo "<script>const sectionToEdit = {$edit_data_json};</script>";
 ?>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     lucide.createIcons();
 
+    // --- Modal Elements (Add/Success) ---
     const modal = document.getElementById('addSectionModal');
     const modalContent = document.getElementById('modalContent');
     const openBtn = document.getElementById('openModalBtn');
@@ -206,9 +340,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const successModal = document.getElementById('successModal');
     const successModalContent = document.getElementById('successModalContent');
     const closeSuccessModalBtn = document.getElementById('closeSuccessModalBtn');
-    const modalSectionName = document.getElementById('modalSectionName');
-    const modalSectionYear = document.getElementById('modalSectionYear');
-    const modalTeacherName = document.getElementById('modalTeacherName');
+
+    // ... (rest of the add/success elements)
 
     const addSectionForm = document.getElementById('addSectionForm');
     const saveSectionBtn = document.getElementById('saveSectionBtn');
@@ -216,6 +349,31 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveText = document.getElementById('saveText');
     const loadingSpinner = document.getElementById('loadingSpinner');
 
+    // --- ADMIN MODAL ELEMENTS ---
+    const adminAuthModal = document.getElementById('adminAuthModal');
+    const adminAuthModalContent = document.getElementById('adminAuthModalContent');
+    const closeAdminAuthModalBtn = document.getElementById('closeAdminAuthModalBtn');
+    const adminAuthForm = document.getElementById('adminAuthForm');
+    const authActionText = document.getElementById('authActionText');
+    const authSectionName = document.getElementById('authSectionName');
+    const authSectionId = document.getElementById('authSectionId');
+    const authHiddenAction = document.getElementById('authHiddenAction');
+    const authHiddenSectionId = document.getElementById('authHiddenSectionId');
+    const authError = document.getElementById('authError');
+    const adminPasswordInput = document.getElementById('admin_password');
+
+    // --- NEW EDIT MODAL ELEMENTS ---
+    const editModal = document.getElementById('editSectionModal');
+    const editModalContent = document.getElementById('editModalContent');
+    const closeEditModalBtn = document.getElementById('closeEditModalBtn');
+    const editForm = document.getElementById('editSectionForm');
+    const editSectionIdInput = document.getElementById('edit_section_id');
+    const editSectionNameInput = document.getElementById('edit_modal_section_name');
+    const editTeacherNameInput = document.getElementById('edit_modal_teacher_name');
+    const editYearRadios = document.getElementsByName('edit_section_year');
+
+
+    // --- Generic Modal Functions ---
     const openModal = (targetModal, targetContent) => {
         targetModal.classList.remove('hidden');
         setTimeout(() => {
@@ -233,47 +391,93 @@ document.addEventListener('DOMContentLoaded', function() {
         
         setTimeout(() => {
             targetModal.classList.add('hidden');
-            if(modal.classList.contains('hidden') && successModal.classList.contains('hidden')) {
+            if(modal.classList.contains('hidden') && successModal.classList.contains('hidden') && adminAuthModal.classList.contains('hidden') && editModal.classList.contains('hidden')) {
                 document.body.style.overflow = '';
             }
         }, 300); 
     };
 
-    openBtn.addEventListener('click', () => openModal(modal, modalContent));
-    closeBtn.addEventListener('click', () => closeModal(modal, modalContent));
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal, modalContent);
-        }
-    });
+    // --- ADMIN AUTH LOGIC ---
+    window.confirmAdminAction = function(action, sectionId, sectionName) {
+        // Set the text and hidden fields
+        authActionText.textContent = action.toUpperCase();
+        authSectionName.textContent = sectionName;
+        authSectionId.textContent = sectionId;
+        authHiddenAction.value = action + '_section';
+        authHiddenSectionId.value = sectionId;
+        
+        // Clear previous error/input
+        authError.classList.add('hidden');
+        adminPasswordInput.value = '';
 
-    closeSuccessModalBtn.addEventListener('click', () => closeModal(successModal, successModalContent));
-    successModal.addEventListener('click', (e) => {
-        if (e.target === successModal) {
-            closeModal(successModal, successModalContent);
-        }
-    });
+        // Open the modal
+        openModal(adminAuthModal, adminAuthModalContent);
+    };
+    
+    // Check for authentication error session variable on load and display it
+    <?php if (isset($_SESSION['auth_error'])): ?>
+        const authErrorMsg = "<?php echo $_SESSION['auth_error']; ?>";
+        const authAction = "<?php echo $_SESSION['auth_action']; ?>";
+        const authSectionID = "<?php echo $_SESSION['auth_section_id']; ?>";
 
-    if (addSectionForm) {
-        addSectionForm.addEventListener('submit', function(event) {
-            if (addSectionForm.checkValidity()) {
-                saveIcon.classList.add('hidden');
-                saveText.textContent = 'Saving...';
-                loadingSpinner.classList.remove('hidden');
-                saveSectionBtn.disabled = true; 
-                saveSectionBtn.classList.remove('hover:bg-blue-700');
-                saveSectionBtn.classList.add('opacity-70', 'cursor-not-allowed');
+        authError.textContent = authErrorMsg;
+        authError.classList.remove('hidden');
+        
+        // Re-open the modal with the error context
+        authActionText.textContent = authAction.replace('_section', '').toUpperCase();
+        authSectionId.textContent = authSectionID;
+        authHiddenAction.value = authAction;
+        authHiddenSectionId.value = authSectionID;
+        
+        // Note: Section name cannot be reliably retrieved after redirect, so it's omitted here.
+        
+        openModal(adminAuthModal, adminAuthModalContent);
+
+        // Clear session variables after displaying (done in PHP above, but good practice to know)
+    <?php endif; ?>
+
+    // --- NEW: EDIT MODAL POPULATION & TRIGGER ---
+    if (sectionToEdit) {
+        // 1. Populate the form fields
+        editSectionIdInput.value = sectionToEdit.id;
+        editSectionNameInput.value = sectionToEdit.name;
+        editTeacherNameInput.value = sectionToEdit.teacher;
+
+        // 2. Select the correct radio button for the year
+        editYearRadios.forEach(radio => {
+            if (radio.value === sectionToEdit.year) {
+                radio.checked = true;
+            } else {
+                radio.checked = false;
             }
         });
-    }
 
-    if (successDetails) {
-        modalSectionName.textContent = successDetails.name;
-        modalSectionYear.textContent = successDetails.year;
-        modalTeacherName.textContent = successDetails.teacher;
-        openModal(successModal, successModalContent);
+        // 3. Open the edit modal
+        openModal(editModal, editModalContent);
     }
     
+    // --- Event Listeners ---
+    openBtn.addEventListener('click', () => openModal(modal, modalContent));
+    closeBtn.addEventListener('click', () => closeModal(modal, modalContent));
+    closeSuccessModalBtn.addEventListener('click', () => closeModal(successModal, successModalContent));
+    closeAdminAuthModalBtn.addEventListener('click', () => closeModal(adminAuthModal, adminAuthModalContent));
+    closeEditModalBtn.addEventListener('click', () => closeModal(editModal, editModalContent)); // New listener
+
+    // Modal click-off handlers
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) { closeModal(modal, modalContent); }
+    });
+    successModal.addEventListener('click', (e) => {
+        if (e.target === successModal) { closeModal(successModal, successModalContent); }
+    });
+    adminAuthModal.addEventListener('click', (e) => {
+        if (e.target === adminAuthModal) { closeModal(adminAuthModal, adminAuthModalContent); }
+    });
+    editModal.addEventListener('click', (e) => { // New listener
+        if (e.target === editModal) { closeModal(editModal, editModalContent); }
+    });
+    
+    // Custom scrollbar CSS injection for better UI
     const style = document.createElement('style');
     style.innerHTML = `
     .custom-scroll::-webkit-scrollbar {

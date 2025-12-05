@@ -7,6 +7,24 @@ if (!isset($section)) {
 $student_count = count($section['students'] ?? []);
 $teacher_display = htmlspecialchars($section['teacher'] ?? 'Unassigned');
 $year_display = htmlspecialchars($section['year'] ?? 'N/A');
+
+// --- NEW LOGIC: Extract and format creation timestamp ---
+$created_at_timestamp = $section['created_at'] ?? null;
+$created_at_display = 'N/A';
+
+if ($created_at_timestamp) {
+    // Attempt to parse and format the timestamp. Assuming the format is YYYY-MM-DD HH:MM:SS
+    try {
+        $datetime = new DateTime($created_at_timestamp);
+        // Format: December 5, 2025 at 4:39 PM
+        $created_at_display = $datetime->format('F j, Y \a\t g:i A');
+    } catch (Exception $e) {
+        // Fallback if parsing fails
+        $created_at_display = "Error: " . $created_at_timestamp;
+    }
+}
+// --- END NEW LOGIC ---
+
 ?>
 <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-200 transition duration-300 hover:shadow-xl">
     <div class="flex justify-between items-start mb-4 pb-4 border-b">
@@ -16,7 +34,12 @@ $year_display = htmlspecialchars($section['year'] ?? 'N/A');
                 <span class="font-bold text-primary-blue mr-4"><?php echo $year_display; ?></span>
                 Teacher: <span class="font-medium text-primary-green"><?php echo $teacher_display; ?></span>
             </p>
-        </div>
+            
+            <p class="text-xs text-gray-400 mt-2 flex items-center space-x-1">
+                <i data-lucide="clock" class="w-3 h-3 flex-shrink-0"></i>
+                <span>Added At: <?php echo $created_at_display; ?></span>
+            </p>
+            </div>
         <div class="text-right p-3 bg-gray-50 rounded-lg border border-gray-200">
             <span class="text-3xl font-extrabold text-primary-blue"><?php echo $student_count; ?></span>
             <p class="text-sm text-gray-500 mt-0.5">Students</p>
@@ -47,7 +70,7 @@ $year_display = htmlspecialchars($section['year'] ?? 'N/A');
 
         <button onclick="alert('In a real app, this would open a modal to manage students for this section (ID: <?php echo htmlspecialchars($section['id'] ?? 'N/A'); ?>)')" class="mt-5 text-sm font-medium flex items-center space-x-1 text-primary-blue hover:text-blue-700 transition duration-150">
             <i data-lucide="external-link" class="w-4 h-4"></i>
-            <span>Manage Section Details</span>
+            <span>Manage Section Students</span>
         </button>
     </div>
 </div>
