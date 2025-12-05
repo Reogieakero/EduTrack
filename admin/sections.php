@@ -48,6 +48,7 @@ if (!in_array($selected_year, $valid_years)) {
 }
 
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_section') {
     $new_section_name = trim($_POST['section_name'] ?? '');
     $new_teacher_name = trim($_POST['teacher_name'] ?? '');
     $new_section_year = trim($_POST['section_year'] ?? '');
@@ -100,68 +101,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']) && ($_POST
             $stmt_select->close();
         }
 
-        $sql_delete = "DELETE FROM sections WHERE id = ?";
-        if ($stmt_delete = $conn->prepare($sql_delete)) {
-            $stmt_delete->bind_param("i", $section_id);
-            if ($stmt_delete->execute()) {
-                if ($deleted_details) {
-                    $_SESSION['delete_success_details'] = $deleted_details;
+        if ($deleted_details) {
+            $sql_delete = "DELETE FROM sections WHERE id = ?";
+            if ($stmt_delete = $conn->prepare($sql_delete)) {
+                $stmt_delete->bind_param("i", $section_id);
+                if ($stmt_delete->execute()) {
+                    $_SESSION['delete_success_details'] = [
+                        'name' => $deleted_details['name'],
+                        'year' => $deleted_details['year'],
+                        'teacher' => $deleted_details['teacher']
+                    ];
+                    header("Location: sections.php");
+                    exit;
+                } else {
+                    $add_error = "ERROR: Could not delete section. " . $stmt_delete->error;
                 }
-                header("Location: sections.php");
-                exit;
-            } else {
-                $add_error = "ERROR: Could not delete the section. " . $stmt_delete->error;
+                $stmt_delete->close();
             }
-            $stmt_delete->close();
         } else {
-             $add_error = "ERROR: Could not prepare delete statement. " . $conn->error;
-        }
-    } 
-    
-    else if ($action_to_perform === 'edit_section' && $section_id > 0) {
-        $sql_fetch_edit = "SELECT id, year, name, teacher FROM sections WHERE id = ?";
-        if ($stmt_fetch_edit = $conn->prepare($sql_fetch_edit)) {
-            $stmt_fetch_edit->bind_param("i", $section_id);
-            if ($stmt_fetch_edit->execute()) {
-                $result_edit = $stmt_fetch_edit->get_result();
-                $section_to_edit = $result_edit->fetch_assoc();
-                
-                if ($section_to_edit) {
-                    $_SESSION['section_to_edit'] = $section_to_edit;
-                }
-                header("Location: sections.php");
-                exit;
-            }
-            $stmt_fetch_edit->close();
+             $add_error = "ERROR: Section not found for deletion.";
         }
     }
+    
+    if ($action_to_perform === 'edit_section' && $section_id > 0) {
+        $sql = "SELECT id, year, name, teacher FROM sections WHERE id = ?";
+        if ($stmt = $conn->prepare($sql)) {
+            $stmt->bind_param("i", $section_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($row = $result->fetch_assoc()) {
+                $_SESSION['section_to_edit'] = $row;
+            }
+            $stmt->close();
+        }
+        header("Location: sections.php");
+        exit;
+    }
 
-    else if ($action_to_perform === 'update_section' && $section_id > 0) {
+    if ($action_to_perform === 'update_section' && $section_id > 0) {
         $updated_name = trim($_POST['edit_section_name'] ?? '');
         $updated_teacher = trim($_POST['edit_teacher_name'] ?? '');
         $updated_year = trim($_POST['edit_section_year'] ?? '');
 
         if (!empty($updated_name) && !empty($updated_teacher) && !empty($updated_year)) {
-            $sql_update = "UPDATE sections SET name = ?, teacher = ?, year = ? WHERE id = ?";
-            if ($stmt_update = $conn->prepare($sql_update)) {
-                $stmt_update->bind_param("sssi", $updated_name, $updated_teacher, $updated_year, $section_id);
-                if ($stmt_update->execute()) {
-                    $_SESSION['edit_success_details'] = [
-                        'name' => $updated_name,
-                        'year' => $updated_year,
-                        'teacher' => $updated_teacher
-                    ];
-                    header("Location: sections.php");
-                    exit;
-                } else {
-                    $add_error = "ERROR: Could not execute the update statement. " . $stmt_update->error;
-                }
-                $stmt_update->close();
-            } else {
-                $add_error = "ERROR: Could not prepare update statement. " . $conn->error;
-            }
+             $sql = "UPDATE sections SET year = ?, name = ?, teacher = ? WHERE id = ?";
+             if ($stmt = $conn->prepare($sql)) {
+                 $stmt->bind_param("sssi", $updated_year, $updated_name, $updated_teacher, $section_id);
+                 if ($stmt->execute()) {
+                     $_SESSION['edit_success_details'] = [
+                         'name' => $updated_name,
+                         'year' => $updated_year,
+                         'teacher' => $updated_teacher
+                     ];
+                     header("Location: sections.php");
+                     exit;
+                 } else {
+                     $add_error = "ERROR: Could not update section. " . $stmt->error;
+                 }
+                 $stmt->close();
+             }
         } else {
-            $add_error = "All fields are required for section update.";
+            $add_error = "ERROR: All fields are required for section update.";
         }
     }
 }
@@ -180,6 +180,7 @@ if ($selected_year !== 'all') {
 
 $sql_fetch .= $where_clause . " ORDER BY created_at DESC, year ASC, name ASC";
 
+
 if ($stmt = $conn->prepare($sql_fetch)) {
     if (!empty($params)) {
         $bind_names = [$types];
@@ -188,23 +189,29 @@ if ($stmt = $conn->prepare($sql_fetch)) {
         }
         call_user_func_array([$stmt, 'bind_param'], $bind_names);
     }
-
+    
     if ($stmt->execute()) {
         $result = $stmt->get_result();
         if ($result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
-                $row['students'] = []; 
-                $sections[] = $row;
+                $sections[] = [
+                    'id' => $row['id'],
+                    'year' => $row['year'],
+                    'name' => $row['name'],
+                    'teacher' => $row['teacher'],
+                    'created_at' => $row['created_at'], 
+                    'students' => [] 
+                ];
             }
         }
     } else {
         $fetch_error = "ERROR: Could not execute the fetch statement. " . $stmt->error;
     }
-
     $stmt->close();
 } else {
     $fetch_error = "ERROR: Could not prepare the fetch statement. " . $conn->error;
 }
+
 
 if (isset($conn)) {
     $conn->close();
@@ -219,23 +226,6 @@ if (isset($conn)) {
 <title>Section Management</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
-<style>
-/* Custom scrollbar for section_card - can be moved to a CSS file if needed */
-.custom-scroll::-webkit-scrollbar {
-    width: 6px;
-}
-.custom-scroll::-webkit-scrollbar-track {
-    background: #f8f9fb;
-    border-radius: 10px;
-}
-.custom-scroll::-webkit-scrollbar-thumb {
-    background: #D1D5DB;
-    border-radius: 10px;
-}
-.custom-scroll::-webkit-scrollbar-thumb:hover {
-    background: #9CA3AF;
-}
-</style>
 <script>
 tailwind.config = {
     theme: {
@@ -294,9 +284,7 @@ include 'components/sidebar.php';
                 <span>All Sections (<?php echo count($sections); ?>)</span>
             </h2>
 
-            <?php 
-            include 'components/year_filter.php'; 
-            ?>
+            <?php include 'components/year_filter.php'; ?>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -335,7 +323,6 @@ echo "<script>const deleteSuccessDetails = {$delete_success_json};</script>";
 echo "<script>const sectionToEdit = {$edit_data_json};</script>";
 ?>
 
-<script src="js/section-management.js"></script>
-
+<script src= "../admin/js/section-manage.js"></script>
 </body>
 </html>

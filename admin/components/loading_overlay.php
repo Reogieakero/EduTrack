@@ -1,4 +1,8 @@
 <?php
+// components/loading_overlay.php
+
+// This component provides a full-screen, hidden loading overlay 
+// that can be activated via JavaScript (e.g., before a page redirect).
 ?>
 
 <div id="loadingOverlay" 

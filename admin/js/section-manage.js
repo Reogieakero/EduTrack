@@ -32,10 +32,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const editSectionNameInput = document.getElementById('edit_modal_section_name');
     const editTeacherNameInput = document.getElementById('edit_modal_teacher_name');
     const editYearRadios = document.getElementsByName('edit_section_year');
-    const updateSectionBtn = document.getElementById('updateSectionBtn');
-    const updateIcon = document.getElementById('updateIcon');
-    const updateText = document.getElementById('updateText');
-    const updateLoadingSpinner = document.getElementById('updateLoadingSpinner');
 
     const deleteModal = document.getElementById('deleteConfirmationModal');
     const deleteModalContent = document.getElementById('deleteModalContent');
@@ -44,6 +40,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const deleteSectionNameSpan = document.getElementById('deleteSectionName');
     
     const loadingMessageText = document.getElementById('loadingMessageText');
+
     const successModalDescription = document.getElementById('success-modal-description');
 
 
@@ -69,16 +66,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 300); 
     };
-    
-    window.initiateEditAction = function(sectionId) {
-        if (overlay) {
-            if (loadingMessageText) {
-                loadingMessageText.textContent = 'Fetching Section Details...'; 
-            }
-            overlay.classList.remove('hidden', 'opacity-0');
-            setTimeout(() => { overlay.classList.add('opacity-100'); }, 10);
-        }
 
+    window.initiateEditAction = function(sectionId) {
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = 'sections.php';
@@ -139,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
         form.submit();
     };
     
-    if (typeof sectionToEdit !== 'undefined' && sectionToEdit && sectionToEdit.id) {
+    if (sectionToEdit) {
         editSectionIdInput.value = sectionToEdit.id;
         editSectionNameInput.value = sectionToEdit.name;
         editTeacherNameInput.value = sectionToEdit.teacher;
@@ -155,35 +144,10 @@ document.addEventListener('DOMContentLoaded', function() {
         openModal(editModal, editModalContent);
     }
     
-    
     openBtn.addEventListener('click', () => openModal(modal, modalContent));
     closeBtn.addEventListener('click', () => closeModal(modal, modalContent));
-    if (addSectionForm) {
-        addSectionForm.addEventListener('submit', function(event) {
-            if (addSectionForm.checkValidity()) {
-                saveIcon.classList.add('hidden');
-                saveText.textContent = 'Saving...';
-                loadingSpinner.classList.remove('hidden');
-                saveSectionBtn.disabled = true; 
-                saveSectionBtn.classList.remove('hover:bg-blue-700');
-                saveSectionBtn.classList.add('opacity-70', 'cursor-not-allowed');
-            }
-        });
-    }
-
+    closeSuccessModalBtn.addEventListener('click', () => closeModal(successModal, successModalContent));
     closeEditModalBtn.addEventListener('click', () => closeModal(editModal, editModalContent)); 
-    if (editForm) {
-        editForm.addEventListener('submit', function(event) {
-            if (editForm.checkValidity()) {
-                updateIcon.classList.add('hidden');
-                updateText.textContent = 'Updating...';
-                updateLoadingSpinner.classList.remove('hidden');
-                updateSectionBtn.disabled = true; 
-                updateSectionBtn.classList.remove('hover:bg-green-700');
-                updateSectionBtn.classList.add('opacity-70', 'cursor-not-allowed');
-            }
-        });
-    }
     
     cancelDeleteBtn.addEventListener('click', () => closeModal(deleteModal, deleteModalContent));
     confirmDeleteBtn.addEventListener('click', function() {
@@ -193,7 +157,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    closeSuccessModalBtn.addEventListener('click', () => closeModal(successModal, successModalContent));
 
     modal.addEventListener('click', (e) => {
         if (e.target === modal) { closeModal(modal, modalContent); }
@@ -208,24 +171,43 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.target === deleteModal) { closeModal(deleteModal, deleteModalContent); }
     });
     
+    const style = document.createElement('style');
+    style.innerHTML = `
+    .custom-scroll::-webkit-scrollbar {
+        width: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+        background: #f8f9fb;
+        border-radius: 10px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+        background: #D1D5DB;
+        border-radius: 10px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+        background: #9CA3AF;
+    }
+    `;
+    document.head.appendChild(style);
+
     let detailsToShow = null;
     let modalTitle = '';
     let modalDescription = ''; 
     
-    if (typeof successDetails !== 'undefined' && successDetails && successDetails.name) {
+    if (successDetails && successDetails.name) {
         detailsToShow = successDetails;
         modalTitle = 'Section Added Successfully!';
         modalDescription = 'The new section has been saved to the database.';
     } 
-    else if (typeof editSuccessDetails !== 'undefined' && editSuccessDetails && editSuccessDetails.name) {
+    else if (editSuccessDetails && editSuccessDetails.name) {
         detailsToShow = editSuccessDetails;
         modalTitle = 'Section Updated Successfully!';
         modalDescription = 'The section details have been successfully updated.';
     }
-    else if (typeof deleteSuccessDetails !== 'undefined' && deleteSuccessDetails && deleteSuccessDetails.name) {
+    else if (deleteSuccessDetails && deleteSuccessDetails.name) {
         detailsToShow = deleteSuccessDetails;
         modalTitle = 'Section Deleted Successfully!';
-        modalDescription = 'The section was permanently removed from the system.';
+        modalDescription = 'The section was permanently removed from the system.'; 
     }
 
 
@@ -233,62 +215,26 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('success-modal-title').textContent = modalTitle;
         
         if (successModalDescription) {
-            successModalDescription.textContent = modalDescription;
+            successModalDescription.textContent = modalDescription; 
         }
 
         document.getElementById('modalSectionName').textContent = detailsToShow.name;
         document.getElementById('modalSectionYear').textContent = detailsToShow.year;
         document.getElementById('modalTeacherName').textContent = detailsToShow.teacher;
         
+        if (addSectionForm) {
+            addSectionForm.reset(); 
+
+            if(saveIcon && saveText && loadingSpinner && saveSectionBtn) {
+                saveIcon.classList.remove('hidden');
+                saveText.textContent = 'Save Section';
+                loadingSpinner.classList.add('hidden');
+                saveSectionBtn.disabled = false;
+                saveSectionBtn.classList.add('hover:bg-blue-700');
+                saveSectionBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
+        }
+
         openModal(successModal, successModalContent);
     }
-    
-    const sidebar = document.getElementById('sidebar');
-    const toggleBtn = document.getElementById('sidebarToggle');
-    const sidebarOverlay = document.getElementById('sidebarOverlay');
-    const mainContent = document.querySelector('main');
-    
-    if (sidebar && toggleBtn && sidebarOverlay) {
-        
-        const openSidebar = () => {
-            sidebar.classList.remove('-translate-x-full');
-            sidebarOverlay.classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
-        };
-
-        const closeSidebar = () => {
-            sidebar.classList.add('-translate-x-full');
-            sidebarOverlay.classList.add('hidden');
-            if(modal.classList.contains('hidden') && successModal.classList.contains('hidden') && editModal.classList.contains('hidden') && deleteModal.classList.contains('hidden')) {
-                 document.body.style.overflow = '';
-            }
-        };
-
-        toggleBtn.addEventListener('click', () => {
-            if (sidebar.classList.contains('-translate-x-full')) {
-                openSidebar();
-            } else {
-                closeSidebar();
-            }
-        });
-
-        sidebarOverlay.addEventListener('click', closeSidebar);
-
-        const navLinks = sidebar.querySelectorAll('nav a');
-        navLinks.forEach(link => {
-            link.addEventListener('click', closeSidebar);
-        });
-        
-        const setMainMargin = () => {
-            if (window.innerWidth < 768) {
-                 if(mainContent) mainContent.style.marginLeft = '4rem';
-            } else {
-                 if(mainContent) mainContent.style.marginLeft = ''; 
-            }
-        };
-
-        setMainMargin();
-        window.addEventListener('resize', setMainMargin);
-    }
-
 });

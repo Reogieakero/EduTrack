@@ -15,29 +15,28 @@
                 <input type="hidden" name="action" value="add_section">
 
                 <div>
-                    <label for="section_name" class="block text-sm font-medium text-gray-700 mb-2">Section Name</label>
-                    <input type="text" id="section_name" name="section_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue transition duration-150 shadow-sm" placeholder="e.g., Beryl, Block 1A, Section 7-1">
-                </div>
-
-                <div>
-                    <label for="teacher_name" class="block text-sm font-medium text-gray-700 mb-2">Assigned Teacher</label>
-                    <input type="text" id="teacher_name" name="teacher_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue transition duration-150 shadow-sm" placeholder="e.g., Mrs. Jane Smith">
-                </div>
-
-                <div class="pt-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-3">Academic Year</label>
-                    <div class="flex flex-wrap gap-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Academic Year</label>
+                    <div class="flex flex-wrap gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <?php 
-                        // Simplified array for the radio buttons
-                        $years = ['Year 7', 'Year 8', 'Year 9', 'Year 10', 'Year 11', 'Year 12'];
-                        foreach ($years as $year):
+                        $academic_years = ['Year 7', 'Year 8', 'Year 9', 'Year 10', 'Year 11', 'Year 12'];
+                        foreach ($academic_years as $year):
                         ?>
-                        <label class="inline-flex items-center">
-                            <input type="radio" name="section_year" value="<?php echo $year; ?>" required class="form-radio h-4 w-4 text-primary-blue focus:ring-primary-blue">
-                            <span class="ml-2 text-gray-700 text-sm"><?php echo $year; ?></span>
+                        <label for="year_<?php echo str_replace(' ', '_', $year); ?>" class="flex items-center space-x-2 cursor-pointer p-2 rounded-lg transition duration-150 border border-transparent hover:border-primary-blue/50">
+                            <input type="radio" id="year_<?php echo str_replace(' ', '_', $year); ?>" name="section_year" value="<?php echo htmlspecialchars($year); ?>" required class="form-radio text-primary-blue h-4 w-4 focus:ring-primary-blue">
+                            <span class="text-sm font-medium text-gray-700"><?php echo $year; ?></span>
                         </label>
                         <?php endforeach; ?>
                     </div>
+                </div>
+
+                <div>
+                    <label for="modal_section_name" class="block text-sm font-medium text-gray-700 mb-1">Section Name (e.g., Diamond, Sapphire)</label>
+                    <input type="text" id="modal_section_name" name="section_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue transition duration-150 shadow-sm" placeholder="e.g., Diamond">
+                </div>
+                
+                <div>
+                    <label for="modal_teacher_name" class="block text-sm font-medium text-gray-700 mb-1">Assigned Teacher</label>
+                    <input type="text" id="modal_teacher_name" name="teacher_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue transition duration-150 shadow-sm" placeholder="e.g., Mr. Jonathan Doe">
                 </div>
 
                 <div class="pt-4 border-t flex justify-end">
@@ -54,3 +53,29 @@
         </div>
     </div>
 </div>
+
+<script>
+    // This script should be added within sections.php document.addEventListener('DOMContentLoaded', ...) block
+    document.addEventListener('DOMContentLoaded', function() {
+        const addSectionForm = document.getElementById('addSectionForm');
+        const saveSectionBtn = document.getElementById('saveSectionBtn');
+        const saveIcon = document.getElementById('saveIcon');
+        const saveText = document.getElementById('saveText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+
+        if (addSectionForm) {
+            addSectionForm.addEventListener('submit', function(event) {
+                // Check if all required fields are filled before showing spinner
+                if (addSectionForm.checkValidity()) {
+                    // Show loading state
+                    saveIcon.classList.add('hidden');
+                    saveText.textContent = 'Saving...';
+                    loadingSpinner.classList.remove('hidden');
+                    saveSectionBtn.disabled = true; // Prevent multiple submissions
+                    saveSectionBtn.classList.remove('hover:bg-blue-700');
+                    saveSectionBtn.classList.add('opacity-70', 'cursor-not-allowed');
+                }
+            });
+        }
+    });
+</script>
