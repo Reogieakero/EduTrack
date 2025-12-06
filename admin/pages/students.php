@@ -198,22 +198,8 @@ include '../components/sidebar.php';
                 <span>All Students (<?php echo count($students); ?>)</span>
             </h2>
 
-            <div class="flex items-center space-x-3">
-                <label for="section_filter" class="text-sm font-medium text-gray-700 hidden sm:block">Filter by Section:</label>
-                <select id="section_filter" onchange="window.location.href='students.php?section_id=' + this.value" 
-                        class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary-blue focus:border-primary-blue sm:text-sm">
-                    <option value="all">All Sections</option>
-                    <?php 
-                    foreach ($sections_list as $id => $section): 
-                        $selected = ($id == $selected_section_id) ? 'selected' : '';
-                    ?>
-                        <option value="<?php echo $id; ?>" <?php echo $selected; ?>>
-                            <?php echo htmlspecialchars($section['year'] . ' - ' . $section['name']); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
+            <?php include '../components/section_filter.php'; ?>
             </div>
-        </div>
 
         <div class="bg-white rounded-xl shadow-lg overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
