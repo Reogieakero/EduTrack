@@ -4,26 +4,21 @@ if (!isset($section)) {
     return;
 }
 
-$student_count = count($section['students'] ?? []);
+$student_count = $section['student_count'] ?? count($section['students'] ?? []);
 $teacher_display = htmlspecialchars($section['teacher'] ?? 'Unassigned');
 $year_display = htmlspecialchars($section['year'] ?? 'N/A');
 
-// --- NEW LOGIC: Extract and format creation timestamp ---
 $created_at_timestamp = $section['created_at'] ?? null;
 $created_at_display = 'N/A';
 
 if ($created_at_timestamp) {
-    // Attempt to parse and format the timestamp. Assuming the format is YYYY-MM-DD HH:MM:SS
     try {
         $datetime = new DateTime($created_at_timestamp);
-        // Format: December 5, 2025 at 4:39 PM
         $created_at_display = $datetime->format('F j, Y \a\t g:i A');
     } catch (Exception $e) {
-        // Fallback if parsing fails
         $created_at_display = "Error: " . $created_at_timestamp;
     }
 }
-// --- END NEW LOGIC ---
 
 ?>
 <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-200 transition duration-300 hover:shadow-xl">

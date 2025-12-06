@@ -6,17 +6,17 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     exit;
 }
 
-require_once '../config/database.php';
+require_once '../../config/database.php';
 
 $add_success_details = null;
 if (isset($_SESSION['add_success_details'])) {
     $add_success_details = $_SESSION['add_success_details'];
-    unset($_SESSION['add_success_details']); 
+    unset($_SESSION['add_success_details']);    
 } 
 
 $section_to_edit = null;
 if (isset($_SESSION['section_to_edit'])) {
-    $section_to_edit = $_SESSION['section_to_edit'];
+    $section_to_edit = $_SESSION['section_to_edit'];    
     unset($_SESSION['section_to_edit']);
 }
 
@@ -213,6 +213,29 @@ if ($stmt = $conn->prepare($sql_fetch)) {
 }
 
 
+$sql_student_count = "SELECT section_id, COUNT(id) as student_count FROM students GROUP BY section_id";
+$student_counts = [];
+
+if ($stmt_count = $conn->prepare($sql_student_count)) {
+    if ($stmt_count->execute()) {
+        $result_count = $stmt_count->get_result();
+        while ($row_count = $result_count->fetch_assoc()) {
+            $student_counts[$row_count['section_id']] = (int)$row_count['student_count'];
+        }
+    } else {
+        error_log("ERROR: Could not execute student count statement: " . $stmt_count->error);
+    }
+    $stmt_count->close();
+} else {
+    error_log("ERROR: Could not prepare student count statement: " . $conn->error);
+}
+
+foreach ($sections as $key => $section) {
+    $section_id = $section['id'];
+    $sections[$key]['student_count'] = $student_counts[$section_id] ?? 0;
+}
+
+
 if (isset($conn)) {
     $conn->close();
 }
@@ -249,11 +272,11 @@ tailwind.config = {
 <body class="bg-page-bg min-h-screen flex">
 
 <?php 
-include 'components/loading_overlay.php'; 
+include '../components/loading_overlay.php'; 
 ?>
 
 <?php 
-include 'components/sidebar.php'; 
+include '../components/sidebar.php'; 
 ?>
 
 <main class="flex-grow ml-16 md:ml-56 p-8">
@@ -284,7 +307,7 @@ include 'components/sidebar.php';
                 <span>All Sections (<?php echo count($sections); ?>)</span>
             </h2>
 
-            <?php include 'components/year_filter.php'; ?>
+            <?php include '../components/year_filter.php'; ?>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -298,7 +321,7 @@ include 'components/sidebar.php';
             </div>
         <?php else: ?>
             <?php foreach ($sections as $section): 
-                include 'components/section_card.php'; 
+                include '../components/section_card.php'; 
             endforeach; ?>
         <?php endif; ?>
         </div>
@@ -306,10 +329,10 @@ include 'components/sidebar.php';
 </main>
 
 <?php 
-include 'components/add_section_modal.php'; 
-include 'components/success_modal.php'; 
-include 'components/edit_section_modal.php'; 
-include 'components/delete_confirmation_modal.php'; 
+include '../components/add_section_modal.php'; 
+include '../components/success_modal.php'; 
+include '../components/edit_section_modal.php'; 
+include '../components/delete_confirmation_modal.php'; 
 
 
 $success_json = json_encode($add_success_details);
@@ -323,6 +346,6 @@ echo "<script>const deleteSuccessDetails = {$delete_success_json};</script>";
 echo "<script>const sectionToEdit = {$edit_data_json};</script>";
 ?>
 
-<script src= "../admin/js/section-manage.js"></script>
+<script src= "../js/section-manage.js"></script>
 </body>
 </html>

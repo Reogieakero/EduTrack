@@ -9,14 +9,15 @@
                 <div class="p-3 bg-primary-green/10 rounded-full mb-4">
                     <i data-lucide="check-circle" class="w-10 h-10 text-primary-green"></i>
                 </div>
-                <h3 class="text-xl font-bold text-gray-900 mb-2" id="success-modal-title">Section Added Successfully!</h3>
-                <p class="text-gray-500 mb-5" id="success-modal-description">The new section has been saved to the database.</p>
+                <h3 class="text-xl font-bold text-gray-900 mb-2" id="success-modal-title">Student Enrolled Successfully!</h3>
+                <p class="text-gray-500 mb-5" id="success-modal-description">The student was successfully enrolled.</p>
             </div>
             
             <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 text-left mb-6">
                 <div class="space-y-1">
-                    <p class="text-sm text-gray-700"><span class="font-semibold">Section Name:</span> <span id="modalSectionName" class="font-medium text-primary-blue"></span></p>
+                    <p class="text-sm text-gray-700"><span class="font-semibold">Student Name:</span> <span id="modalStudentName" class="font-medium text-primary-blue"></span></p>
                     <p class="text-sm text-gray-700"><span class="font-semibold">Academic Year:</span> <span id="modalSectionYear" class="font-medium text-primary-green"></span></p>
+                    <p class="text-sm text-gray-700"><span class="font-semibold">Section Name:</span> <span id="modalSectionName" class="font-medium"></span></p>
                     <p class="text-sm text-gray-700"><span class="font-semibold">Assigned Teacher:</span> <span id="modalTeacherName" class="font-medium"></span></p>
                 </div>
             </div>

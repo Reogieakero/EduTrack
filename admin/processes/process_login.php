@@ -23,7 +23,7 @@ function loadEnv($path) {
         $_ENV[$key] = $value;
     }
 }
-loadEnv(__DIR__ . '/.env');
+loadEnv(__DIR__ . '/../.env');
 session_start();
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $input_username = $_POST['username'] ?? '';
@@ -33,7 +33,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if ($input_username === $ADMIN_USER && $input_password === $ADMIN_PASS) {
         $_SESSION['loggedin'] = true;
         $_SESSION['username'] = $ADMIN_USER;
-        header("Location: dashboard.php"); 
+        header("Location: ../pages/dashboard.php");
         exit;
     } else {
         header("Location: login.html?error=invalid_credentials");

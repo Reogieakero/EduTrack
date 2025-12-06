@@ -44,7 +44,7 @@ tailwind.config = {
 </head>
 <body class="bg-page-bg min-h-screen flex">
 
-<?php include 'components/sidebar.php'; ?>
+<?php include '../components/sidebar.php'; ?>
 
 <main class="flex-grow ml-16 md:ml-56 p-8">
     <header class="mb-8 border-b pb-4">
