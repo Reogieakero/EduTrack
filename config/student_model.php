@@ -1,20 +1,10 @@
 <?php
-// config/student_model.php
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date; 
 
-// Assumes 'database.php' has established $conn
 require_once __DIR__ . '/database.php';
 
-/**
- * Checks if a student with the given name components already exists.
- * @param mysqli $conn The database connection object.
- * @param string $first_name Student's first name.
- * @param string $last_name Student's last name.
- * @param string|null $middle_initial Student's middle initial, or null.
- * @return bool True if a duplicate student is found, false otherwise.
- */
 function check_for_duplicate_student($conn, $first_name, $last_name, $middle_initial) {
     
     $sql = "SELECT id FROM students WHERE 
@@ -54,11 +44,6 @@ function check_for_duplicate_student($conn, $first_name, $last_name, $middle_ini
     return $is_duplicate;
 }
 
-/**
- * Generates a unique student ID in the format YYYY-NNNN.
- * @param mysqli $conn The database connection object.
- * @return string|null The new student ID or null on sequence overflow/error.
- */
 function generate_student_id($conn) {
     $current_year = date('Y');
     $search_pattern = $current_year . '-%';
@@ -95,11 +80,6 @@ function generate_student_id($conn) {
     return $current_year . '-' . $formatted_seq;
 }
 
-/**
- * Fetches the list of all sections.
- * @param mysqli $conn The database connection object.
- * @return array An associative array of sections, keyed by ID.
- */
 function fetch_sections_list($conn) {
     $sections_list = []; 
     $sql = "SELECT id, year, name, teacher FROM sections ORDER BY year ASC, name ASC";
@@ -119,14 +99,6 @@ function fetch_sections_list($conn) {
     return $sections_list;
 }
 
-/**
- * Fetches student records based on filter and search terms.
- * @param mysqli $conn The database connection object.
- * @param string|int $section_id Filter by section ID or 'all'.
- * @param string $search_term Search string for names or ID.
- * @param string|null &$fetch_error Reference to store any fetch error message.
- * @return array An array of student records.
- */
 function fetch_students($conn, $selected_section_id, $search_term, &$fetch_error) {
     $students = [];
     $sql_fetch = "SELECT s.*, sec.year as section_year, sec.name as section_name, sec.teacher as teacher_name FROM students s JOIN sections sec ON s.section_id = sec.id";
@@ -142,7 +114,6 @@ function fetch_students($conn, $selected_section_id, $search_term, &$fetch_error
 
     if (!empty($search_term)) {
         $search_pattern = '%' . $search_term . '%';
-        // Note: CONCAT for full name search can be slow on large tables
         $where_clauses[] = "(s.first_name LIKE ? OR s.last_name LIKE ? OR CONCAT(s.first_name, ' ', s.last_name) LIKE ? OR CONCAT(s.last_name, ' ', s.first_name) LIKE ? OR s.id LIKE ?)";
         $params[] = $search_pattern;
         $params[] = $search_pattern;
@@ -185,12 +156,6 @@ function fetch_students($conn, $selected_section_id, $search_term, &$fetch_error
     return $students;
 }
 
-/**
- * Fetches quarterly grades for a list of student IDs.
- * @param mysqli $conn The database connection object.
- * @param array $student_ids Array of student IDs.
- * @return array An associative array of grades keyed by student ID, then quarter (Q1-Q4).
- */
 function fetch_grades_by_student($conn, $student_ids) {
     $grades_by_student = [];
     if (empty($student_ids)) {
@@ -223,7 +188,6 @@ function fetch_grades_by_student($conn, $student_ids) {
                 }
                 
                 if (in_array($quarter, ['Q1', 'Q2', 'Q3', 'Q4'])) {
-                    // Format grade to 0 decimal places as in original file
                     $grades_by_student[$student_id][$quarter] = number_format($row['grade'], 0); 
                 }
             }
@@ -237,23 +201,8 @@ function fetch_grades_by_student($conn, $student_ids) {
     return $grades_by_student;
 }
 
-/**
- * Executes the logic for adding a single new student.
- * ... (Add the bulk of the 'add_student' and 'bulk_add_students' POST logic here)
- * ... (Add the bulk of the 'delete_student' and 'fetch_edit_data' and 'edit_student' POST logic here)
- * * *For brevity in this answer, I will use an ellipsis for the large POST logic blocks.*
- * *In a real implementation, you would move the entire POST block from the original students.php*
- * *into new functions here (e.g., `handle_add_student`, `handle_bulk_add_students`, etc.)*
- */
-
-// --- START of Placeholder for Data Manipulation Functions (Add, Edit, Delete, Bulk) ---
-
-// NOTE: These functions would contain the INSERT, UPDATE, DELETE logic previously in students.php
-
 function add_new_student($conn, $sections_list, $post_data) {
     
-    // ... complete logic for POST action 'add_student' goes here ...
-    // The original code uses $_SESSION for feedback, which should be kept.
     
     $first_name = trim($post_data['first_name'] ?? '');
     $last_name = trim($post_data['last_name'] ?? '');
@@ -310,8 +259,6 @@ function add_new_student($conn, $sections_list, $post_data) {
 }
 
 function handle_bulk_add_students($conn, $sections_list, $files_data) {
-    // ... complete logic for POST action 'bulk_add_students' goes here ...
-    // This part is quite long due to file handling and PhpSpreadsheet.
     
     if (!isset($files_data['student_file']) || $files_data['student_file']['error'] !== UPLOAD_ERR_OK) {
         $_SESSION['add_error_details'] = "ERROR: No file uploaded or upload error occurred.";
@@ -438,7 +385,6 @@ function handle_bulk_add_students($conn, $sections_list, $files_data) {
 }
 
 function delete_existing_student($conn, $student_id) {
-    // ... complete logic for POST action 'delete_student' goes here ...
     
     $sql_select = "SELECT s.first_name, s.last_name, s.middle_initial, sec.year, sec.name as section_name, sec.teacher FROM students s JOIN sections sec ON s.section_id = sec.id WHERE s.id = ?";
     $deleted_details = null;
@@ -479,7 +425,6 @@ function delete_existing_student($conn, $student_id) {
 }
 
 function fetch_student_for_edit($conn, $student_id) {
-    // ... complete logic for POST action 'fetch_edit_data' goes here ...
     
     $sql_fetch_student = "SELECT id, first_name, last_name, middle_initial, section_id, date_of_birth FROM students WHERE id = ?";
     
@@ -504,7 +449,6 @@ function fetch_student_for_edit($conn, $student_id) {
 }
 
 function update_existing_student($conn, $sections_list, $post_data) {
-    // ... complete logic for POST action 'edit_student' goes here ...
 
     $student_id = trim($post_data['student_id'] ?? ''); 
     $first_name = trim($post_data['first_name'] ?? '');
