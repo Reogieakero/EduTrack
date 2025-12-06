@@ -19,12 +19,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const successModal = document.getElementById('successModal');
     const successModalContent = document.getElementById('successModalContent');
     const closeSuccessModalBtn = document.getElementById('closeSuccessModalBtn');
+    
+    // ADDED CONSTANT
+    const modalDetailBlock = document.getElementById('modal-detail-block');
 
     const addStudentForm = document.getElementById('addStudentForm');
     const saveStudentBtn = document.getElementById('saveStudentBtn');
     const saveIcon = document.getElementById('saveIcon');
     const saveText = document.getElementById('saveText');
     const loadingSpinner = document.getElementById('loadingSpinner');
+    
+    const bulkAddStudentForm = document.getElementById('bulkAddStudentForm');
+    const saveBulkStudentBtn = document.getElementById('saveBulkStudentBtn');
+    const saveBulkIcon = document.getElementById('saveBulkIcon');
+    const saveBulkText = document.getElementById('saveBulkText');
+    const loadingBulkSpinner = document.getElementById('loadingBulkSpinner');
 
     const successModalDescription = document.getElementById('success-modal-description');
     
@@ -48,6 +57,38 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('search-input'); 
     const searchForm = document.getElementById('searchForm'); 
     let searchTimeout = null; 
+    
+    const tabs = document.querySelectorAll('.tab-button');
+    const singleEnrollTab = document.getElementById('singleEnrollTab');
+    const bulkEnrollTab = document.getElementById('bulkEnrollTab');
+    const singleEnrollContent = document.getElementById('singleEnrollContent');
+    const bulkEnrollContent = document.getElementById('bulkEnrollContent');
+    
+    const showTab = (tabName) => {
+        tabs.forEach(tab => {
+            tab.classList.remove('border-primary-green', 'text-primary-green', 'border-primary-blue', 'text-primary-blue');
+            tab.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+        });
+        
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.add('hidden');
+        });
+        
+        const activeTab = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
+        const activeContent = document.getElementById(`${tabName}EnrollContent`);
+        
+        if (activeTab) {
+            const activeColorClass = tabName === 'single' ? 'border-primary-green text-primary-green' : 'border-primary-blue text-primary-blue';
+            activeTab.classList.add(...activeColorClass.split(' '));
+            activeTab.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+        }
+        if (activeContent) {
+            activeContent.classList.remove('hidden');
+        }
+    };
+    
+    if (singleEnrollTab) singleEnrollTab.addEventListener('click', () => showTab('single'));
+    if (bulkEnrollTab) bulkEnrollTab.addEventListener('click', () => showTab('bulk'));
 
     const openModal = (targetModal, targetContent) => {
         targetModal.classList.remove('hidden');
@@ -56,6 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
             targetContent.classList.remove('scale-95', 'opacity-0');
             targetContent.classList.add('scale-100', 'opacity-100');
             document.body.style.overflow = 'hidden'; 
+            showTab('single'); 
         }, 10);
     };
 
@@ -81,6 +123,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 saveStudentBtn.disabled = true; 
                 saveStudentBtn.classList.remove('hover:bg-green-700');
                 saveStudentBtn.classList.add('opacity-70', 'cursor-not-allowed');
+            }
+        });
+    }
+    
+    if (bulkAddStudentForm) {
+        bulkAddStudentForm.addEventListener('submit', function(event) {
+            if (bulkAddStudentForm.checkValidity()) {
+                saveBulkIcon.classList.add('hidden');
+                saveBulkText.textContent = 'Uploading...';
+                loadingBulkSpinner.classList.remove('hidden');
+                saveBulkStudentBtn.disabled = true; 
+                saveBulkStudentBtn.classList.remove('hover:bg-blue-700');
+                saveBulkStudentBtn.classList.add('opacity-70', 'cursor-not-allowed');
+                
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                if (loadingOverlay) {
+                    if (loadingMessageText) {
+                        loadingMessageText.textContent = 'Processing Bulk Enrollment...';
+                    }
+                    loadingOverlay.classList.remove('hidden');
+                    setTimeout(() => {
+                        loadingOverlay.classList.remove('opacity-0');
+                    }, 10);
+                }
             }
         });
     }
@@ -224,6 +290,12 @@ document.addEventListener('DOMContentLoaded', function() {
     let modalTitle = '';
     let modalDescription = ''; 
     
+    const errorList = document.getElementById('success-modal-errors');
+    if (errorList) {
+        errorList.innerHTML = '';
+        errorList.classList.add('hidden');
+    }
+    
     if (typeof successDetails !== 'undefined' && successDetails && successDetails.name) {
         detailsToShow = successDetails;
         modalTitle = 'Student Enrolled Successfully!';
@@ -239,12 +311,42 @@ document.addEventListener('DOMContentLoaded', function() {
         modalTitle = 'Student Deleted Successfully!';
         modalDescription = 'The student was permanently removed from the system.'; 
     }
+    else if (typeof bulkSuccessDetails !== 'undefined' && bulkSuccessDetails && (bulkSuccessDetails.added > 0 || bulkSuccessDetails.failed > 0)) {
+        detailsToShow = bulkSuccessDetails;
+        // User request: "Bulk uploaded successfully"
+        modalTitle = 'Bulk Enrollment Complete!'; 
+        modalDescription = `Successfully added ${detailsToShow.added} students. ${detailsToShow.failed} students failed to enroll.`;
+        
+        if (bulkSuccessDetails.failed > 0 && errorList) {
+            errorList.classList.remove('hidden');
+            detailsToShow.errors.slice(0, 5).forEach(error => { 
+                const listItem = document.createElement('li');
+                listItem.textContent = error;
+                errorList.appendChild(listItem);
+            });
+            if (detailsToShow.errors.length > 5) {
+                const moreItem = document.createElement('li');
+                moreItem.textContent = `... and ${detailsToShow.errors.length - 5} more errors. Check server logs for full details.`;
+                errorList.appendChild(moreItem);
+            }
+        }
+    }
+
 
     if (detailsToShow) {
         document.getElementById('success-modal-title').textContent = modalTitle;
         
         if (successModalDescription) {
-            successModalDescription.textContent = modalDescription; 
+            successModalDescription.innerHTML = modalDescription; 
+        }
+        
+        // NEW LOGIC TO HIDE/SHOW DETAILS BLOCK
+        if (modalDetailBlock) {
+            if (typeof bulkSuccessDetails !== 'undefined' && bulkSuccessDetails && (bulkSuccessDetails.added > 0 || bulkSuccessDetails.failed > 0)) {
+                modalDetailBlock.classList.add('hidden');
+            } else {
+                modalDetailBlock.classList.remove('hidden');
+            }
         }
         
         if (document.getElementById('modalStudentName')) {
@@ -271,6 +373,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 saveStudentBtn.classList.remove('opacity-70', 'cursor-not-allowed');
             }
         }
+        
+        if (bulkAddStudentForm) {
+            bulkAddStudentForm.reset(); 
+            if(saveBulkIcon && saveBulkText && loadingBulkSpinner && saveBulkStudentBtn) {
+                saveBulkIcon.classList.remove('hidden');
+                saveBulkText.textContent = 'Upload & Enroll Students';
+                loadingBulkSpinner.classList.add('hidden');
+                saveBulkStudentBtn.disabled = false;
+                saveBulkStudentBtn.classList.add('hover:bg-blue-700');
+                saveBulkStudentBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
+        }
 
         openModal(successModal, successModalContent);
     }
@@ -285,7 +399,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const currentSectionId = studentToEdit.section_id.toString();
             
-            const selectedOption = document.querySelector(`#edit-section-options-list li[data-value="${currentSectionId}"]`);
+            const selectedOption = document.querySelector(`#edit-section-options-list li[data-value=\"${currentSectionId}\"]`);
             
             if (selectedOption && typeof handleSectionSelect === 'function') {
                 handleSectionSelect(selectedOption, 'edit');
@@ -310,5 +424,90 @@ document.addEventListener('DOMContentLoaded', function() {
             
             openModal(editModal, editModalContent);
         }, 500); 
+    }
+});
+
+
+function toggleDropdown(buttonElement) {
+    const isEditModal = buttonElement.id.includes('edit');
+    const optionsListId = isEditModal ? 'edit-section-options-list' : 'section-options-list';
+    const optionsList = document.getElementById(optionsListId);
+    const isHidden = optionsList.classList.contains('hidden');
+    
+    if (isHidden) {
+        document.querySelectorAll('ul[id$="-section-options-list"]').forEach(list => {
+            if (list !== optionsList) {
+                list.classList.add('hidden');
+                const button = list.previousElementSibling;
+                if (button) button.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        optionsList.classList.remove('hidden');
+        buttonElement.setAttribute('aria-expanded', 'true');
+    } else {
+        optionsList.classList.add('hidden');
+        buttonElement.setAttribute('aria-expanded', 'false');
+    }
+}
+
+function handleSectionSelect(listItem, modalType = 'add') {
+    const sectionId = listItem.getAttribute('data-value');
+    const sectionDisplay = listItem.getAttribute('data-display');
+    
+    const idPrefix = modalType === 'edit' ? 'edit_' : 'modal_';
+    const buttonTextId = modalType === 'edit' ? 'edit-selected-section-text' : 'selected-section-text';
+    const optionsListId = modalType === 'edit' ? 'edit-section-options-list' : 'section-options-list';
+    
+    document.getElementById(idPrefix + 'section_id').value = sectionId;
+    
+    const buttonTextSpan = document.getElementById(buttonTextId);
+    buttonTextSpan.textContent = sectionDisplay;
+    buttonTextSpan.classList.remove('text-gray-400');
+    buttonTextSpan.classList.add('text-gray-900');
+
+    const optionsList = document.getElementById(optionsListId);
+    
+    optionsList.querySelectorAll('li').forEach(li => {
+        li.classList.remove('bg-primary-green', 'text-white', 'font-semibold');
+        li.classList.add('hover:bg-gray-100');
+        const checkIcon = li.querySelector('.section-check-icon');
+        if (checkIcon) checkIcon.classList.add('hidden');
+    });
+
+    listItem.classList.add('bg-primary-green', 'text-white', 'font-semibold');
+    listItem.classList.remove('hover:bg-gray-100');
+    const checkIcon = listItem.querySelector('.section-check-icon');
+    if (checkIcon) checkIcon.classList.remove('hidden');
+    
+    const selectButton = optionsList.previousElementSibling;
+    optionsList.classList.add('hidden');
+    selectButton.setAttribute('aria-expanded', 'false');
+}
+
+document.addEventListener('click', function(event) {
+    const addCustomSelect = document.getElementById('custom-section-select');
+    const editCustomSelect = document.getElementById('edit-custom-section-select'); 
+    const addStudentModal = document.getElementById('addStudentModal');
+    const editStudentModal = document.getElementById('editStudentModal'); 
+
+    if (addCustomSelect && !addCustomSelect.contains(event.target) && addStudentModal && !addStudentModal.classList.contains('hidden')) {
+        const optionsList = document.getElementById('section-options-list');
+        const selectButton = document.getElementById('sectionSelectButton');
+        
+        if (optionsList && !optionsList.classList.contains('hidden')) {
+            optionsList.classList.add('hidden');
+            selectButton.setAttribute('aria-expanded', 'false');
+        }
+    }
+    
+    if (editCustomSelect && !editCustomSelect.contains(event.target) && editStudentModal && !editStudentModal.classList.contains('hidden')) {
+        const optionsList = document.getElementById('edit-section-options-list');
+        const selectButton = document.getElementById('editSectionSelectButton');
+        
+        if (optionsList && !optionsList.classList.contains('hidden')) {
+            optionsList.classList.add('hidden');
+            selectButton.setAttribute('aria-expanded', 'false');
+        }
     }
 });

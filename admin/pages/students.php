@@ -6,23 +6,70 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     exit;
 }
 
+// ----------------------------------------------------
+// 1. ADD COMPOSER AUTOLOAD AND PHPSPREADSHEET IMPORTS
+// Assumes 'students.php' is in a subdirectory like 'pages'
+require __DIR__ . '/../../vendor/autoload.php';
+
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date; // For converting Excel dates
+// ----------------------------------------------------
+
 require_once '../../config/database.php';
 
 /**
- * Generates a new unique student ID in the format YYYY-NNNN.
- * The NNNN is a 4-digit sequential number, reset yearly.
- * @param mysqli $conn The database connection object.
- * @return string|null The new student ID or null on error.
+ * Checks if a student with the same name already exists in the database.
+ * * @param mysqli $conn The database connection object.
+ * @param string $first_name
+ * @param string $last_name
+ * @param string|null $middle_initial
+ * @return bool True if a duplicate is found, false otherwise.
  */
+function check_for_duplicate_student($conn, $first_name, $last_name, $middle_initial) {
+    // Basic check: Case-insensitive match on first and last name.
+    // Middle initial must also match if both are non-null.
+    
+    $sql = "SELECT id FROM students WHERE 
+            LOWER(first_name) = LOWER(?) AND 
+            LOWER(last_name) = LOWER(?)";
+
+    $params = [$first_name, $last_name];
+    $types = 'ss';
+
+    // Handle middle initial check
+    if (!empty($middle_initial)) {
+        $sql .= " AND LOWER(middle_initial) = LOWER(?)";
+        $params[] = $middle_initial;
+        $types .= 's';
+    } else {
+        // If the input MI is null, only check for existing records where MI is null
+        $sql .= " AND middle_initial IS NULL";
+    }
+
+    if ($stmt = $conn->prepare($sql)) {
+        // Dynamically bind parameters
+        $bind_names = [$types];
+        for ($i=0; $i<count($params); $i++) {
+            $bind_names[] = &$params[$i];
+        }
+        call_user_func_array([$stmt, 'bind_param'], $bind_names);
+        
+        if ($stmt->execute()) {
+            $stmt->store_result();
+            $is_duplicate = $stmt->num_rows > 0;
+            $stmt->close();
+            return $is_duplicate;
+        }
+        $stmt->close();
+    }
+    return false; // Return false if a database error occurs (safest default)
+}
+
 function generate_student_id($conn) {
-    // Get the current year (e.g., 2025)
     $current_year = date('Y');
     
-    // Pattern to search for IDs of the current year, e.g., '2025-%'
     $search_pattern = $current_year . '-%';
     
-    // Query to find the maximum sequence number (NNNN) for the current year
-    // It finds the max of the substring after the hyphen, converting it to an unsigned integer.
     $sql = "SELECT MAX(CAST(SUBSTRING(id, 6) AS UNSIGNED)) as max_seq 
             FROM students 
             WHERE id LIKE ?";
@@ -33,26 +80,21 @@ function generate_student_id($conn) {
         if ($stmt->execute()) {
             $result = $stmt->get_result();
             if ($row = $result->fetch_assoc()) {
-                // max_seq will be null if no records exist for the year, so coalesce to 0
                 $max_seq = (int)($row['max_seq'] ?? 0);
             }
         }
         $stmt->close();
     }
     
-    // Calculate the next sequence number (NNNN)
     $next_seq = $max_seq + 1;
     
-    // Check for overflow (max 9999)
     if ($next_seq > 9999) {
         error_log("Student ID sequence overflow for year " . $current_year);
         return null; 
     }
     
-    // Format the sequence number to 4 digits (e.g., 1 -> 0001, 123 -> 0123)
     $formatted_seq = str_pad($next_seq, 4, '0', STR_PAD_LEFT);
     
-    // Construct the final student ID (e.g., 2025-0001)
     $new_student_id = $current_year . '-' . $formatted_seq;
     
     return $new_student_id;
@@ -74,6 +116,17 @@ if (isset($_SESSION['delete_success_details'])) {
     $delete_success_details = $_SESSION['delete_success_details'];
     unset($_SESSION['delete_success_details']);
 }
+$bulk_success_details = null;
+if (isset($_SESSION['bulk_success_details'])) {
+    $bulk_success_details = $_SESSION['bulk_success_details'];
+    unset($_SESSION['bulk_success_details']);
+}
+$add_error_details = null; // Changed from $add_error to $add_error_details
+if (isset($_SESSION['add_error_details'])) {
+    $add_error_details = $_SESSION['add_error_details'];
+    unset($_SESSION['add_error_details']);
+}
+
 $student_to_edit = null; 
 if (isset($_SESSION['student_to_edit'])) {
     $student_to_edit = $_SESSION['student_to_edit'];
@@ -83,7 +136,6 @@ if (isset($_SESSION['student_to_edit'])) {
 $students = [];
 $sections_list = []; 
 $grades_by_student = []; 
-$add_error = false;
 $fetch_error = false;
 
 $selected_section_id = $_GET['section_id'] ?? 'all';
@@ -106,29 +158,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'add_student') {
         $first_name = trim($_POST['first_name'] ?? '');
         $last_name = trim($_POST['last_name'] ?? '');
-        $middle_initial = trim($_POST['middle_initial'] ?? '');
+        $middle_initial_raw = trim($_POST['middle_initial'] ?? '');
         $section_id = (int)($_POST['section_id'] ?? 0);
         $date_of_birth = trim($_POST['date_of_birth'] ?? '');
+        $middle_initial = empty($middle_initial_raw) ? null : strtoupper(substr($middle_initial_raw, 0, 1));
 
         if (empty($first_name) || empty($last_name) || $section_id <= 0 || empty($date_of_birth)) {
-            $add_error = "All required student fields are necessary.";
-        } else {
-            // Generate the new unique student ID (YYYY-NNNN format)
+            $_SESSION['add_error_details'] = "All required student fields are necessary.";
+        } 
+        // ----------------------------------------
+        // DUPLICATE CHECK FOR SINGLE ADD
+        // ----------------------------------------
+        else if (check_for_duplicate_student($conn, $first_name, $last_name, $middle_initial)) {
+            $full_name = $last_name . ', ' . $first_name . ($middle_initial ? ' ' . $middle_initial . '.' : '');
+            $_SESSION['add_error_details'] = "ERROR: A student with the name **{$full_name}** already exists in the system.";
+        }
+        // ----------------------------------------
+        else {
             $new_id = generate_student_id($conn);
             
             if (is_null($new_id)) {
-                $add_error = "ERROR: Could not generate a unique student ID. Sequence overflow or database error.";
+                $_SESSION['add_error_details'] = "ERROR: Could not generate a unique student ID. Sequence overflow or database error.";
             } else {
-                $middle_initial = empty($middle_initial) ? null : strtoupper(substr($middle_initial, 0, 1));
-
-                // UPDATE SQL to include 'id' field
+                
                 $sql = "INSERT INTO students (id, first_name, last_name, middle_initial, section_id, date_of_birth, enrollment_date) VALUES (?, ?, ?, ?, ?, ?, NOW())";
                 
                 if ($stmt = $conn->prepare($sql)) {
-                    // UPDATE bind_param to include 's' for the new ID
                     $stmt->bind_param("ssssis", $param_id, $param_first_name, $param_last_name, $param_middle_initial, $param_section_id, $param_dob);
                     
-                    // Set the parameter for the new ID
                     $param_id = $new_id;
                     $param_first_name = $first_name;
                     $param_last_name = $last_name;
@@ -147,28 +204,169 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             'section_year' => $section_info['year'],
                             'teacher_name' => $section_info['teacher']
                         ];
-                        header("Location: students.php");
-                        exit;
                     } else {
-                        $add_error = "ERROR: Could not execute the insert statement. " . $stmt->error;
+                        $_SESSION['add_error_details'] = "ERROR: Could not execute the insert statement. " . $stmt->error;
                     }
                     $stmt->close();
                 } else {
-                    $add_error = "ERROR: Could not prepare the insert statement. " . $conn->error;
+                    $_SESSION['add_error_details'] = "ERROR: Could not prepare the insert statement. " . $conn->error;
                 }
             }
         }
+        header("Location: students.php");
+        exit;
     }
     
+    // ------------------------------------------------------------------------------------------------
+    // UPDATED: BULK ADD STUDENTS LOGIC USING PHPSPREADSHEET
+    // ------------------------------------------------------------------------------------------------
+    if ($_POST['action'] === 'bulk_add_students') {
+        if (isset($_FILES['student_file']) && $_FILES['student_file']['error'] === UPLOAD_ERR_OK) {
+            $file_tmp_path = $_FILES['student_file']['tmp_name'];
+            $file_extension = strtolower(pathinfo($_FILES['student_file']['name'], PATHINFO_EXTENSION));
+
+            $allowed_extensions = ['csv', 'xlsx', 'xls'];
+
+            if (!in_array($file_extension, $allowed_extensions)) {
+                $_SESSION['add_error_details'] = "ERROR: Only CSV, XLSX, and XLS files are supported for bulk upload.";
+            } else {
+                $students_added = 0;
+                $students_failed = 0;
+                $errors = [];
+                
+                try {
+                    $spreadsheet = IOFactory::load($file_tmp_path);
+                    $worksheet = $spreadsheet->getActiveSheet();
+                    $rows = $worksheet->toArray(); 
+
+                    $row_count = 1;
+                    
+                    $sql_insert = "INSERT INTO students (id, first_name, last_name, middle_initial, section_id, date_of_birth, enrollment_date) VALUES (?, ?, ?, ?, ?, ?, NOW())";
+                    
+                    if ($stmt_insert = $conn->prepare($sql_insert)) {
+                        
+                        foreach ($rows as $index => $data) {
+                            if ($index === 0) {
+                                continue; 
+                            }
+                            
+                            $row_count++;
+                            
+                            $first_name = trim($data[0] ?? '');
+                            $last_name = trim($data[1] ?? '');
+                            $middle_initial_raw = trim($data[2] ?? '');
+                            $section_name_raw = trim($data[3] ?? '');
+                            $date_of_birth_raw = trim($data[4] ?? '');
+                            
+                            $middle_initial = empty($middle_initial_raw) ? null : strtoupper(substr($middle_initial_raw, 0, 1));
+                            
+                            // 1. Resolve Section ID
+                            $section_id = 0;
+                            foreach ($sections_list as $id => $section) {
+                                $full_section_name = $section['year'] . ' - ' . $section['name'];
+                                if (strcasecmp($full_section_name, $section_name_raw) === 0) {
+                                    $section_id = $id;
+                                    break;
+                                }
+                            }
+                            
+                            // 2. Format Date of Birth
+                            $date_of_birth = null;
+                            if (!empty($date_of_birth_raw)) {
+                                if (is_numeric($date_of_birth_raw) && $date_of_birth_raw > 1) {
+                                    try {
+                                        $date_of_birth = Date::excelToDateTimeObject($date_of_birth_raw)->format('Y-m-d');
+                                    } catch (\Exception $e) {
+                                        $date_of_birth = $date_of_birth_raw;
+                                    }
+                                } else {
+                                    $date_of_birth = $date_of_birth_raw;
+                                }
+                            }
+
+                            // 3. Basic Validation
+                            if (empty($first_name) || empty($last_name) || $section_id <= 0 || empty($date_of_birth)) {
+                                $students_failed++;
+                                $errors[] = "Row {$row_count} (Name: {$last_name}, {$first_name}): Missing or invalid data (First Name, Last Name, Section, or DOB).";
+                                continue;
+                            }
+                            
+                            // 4. DUPLICATE CHECK FOR BULK ADD
+                            if (check_for_duplicate_student($conn, $first_name, $last_name, $middle_initial)) {
+                                $students_failed++;
+                                $errors[] = "Row {$row_count} (Name: {$last_name}, {$first_name}): Duplicate student found. Skipping insertion.";
+                                continue;
+                            }
+                            
+                            // 5. Generate ID and Insert
+                            $new_id = generate_student_id($conn);
+
+                            if (is_null($new_id)) {
+                                $students_failed++;
+                                $errors[] = "Row {$row_count} (Name: {$last_name}, {$first_name}): Could not generate unique student ID.";
+                                continue;
+                            }
+                            
+                            $new_id_param = $new_id;
+                            $first_name_param = $first_name;
+                            $last_name_param = $last_name;
+                            $middle_initial_param = $middle_initial;
+                            $section_id_param = $section_id;
+                            $date_of_birth_param = $date_of_birth;
+
+                            $stmt_insert->bind_param("ssssis", $new_id_param, $first_name_param, $last_name_param, $middle_initial_param, $section_id_param, $date_of_birth_param);
+
+                            if ($stmt_insert->execute()) {
+                                $students_added++;
+                            } else {
+                                $students_failed++;
+                                $errors[] = "Row {$row_count} (Name: {$last_name}, {$first_name}): Database insertion failed. " . $stmt_insert->error;
+                            }
+                        }
+                        $stmt_insert->close();
+                    } else {
+                        $_SESSION['add_error_details'] = "ERROR: Could not prepare the bulk insert statement. " . $conn->error;
+                    }
+                } catch (\Exception $e) {
+                    $_SESSION['add_error_details'] = "ERROR: File processing failed. Ensure the file is a valid CSV or Excel format. Details: " . $e->getMessage();
+                }
+
+
+                if ($students_added > 0 || $students_failed > 0) {
+                    $_SESSION['bulk_success_details'] = [
+                        'added' => $students_added,
+                        'failed' => $students_failed,
+                        'errors' => $errors
+                    ];
+                    header("Location: students.php");
+                    exit;
+                }
+                
+                if (isset($_SESSION['add_error_details'])) {
+                     header("Location: students.php");
+                     exit;
+                }
+            }
+        } else {
+            $_SESSION['add_error_details'] = "ERROR: No file uploaded or upload error occurred.";
+        }
+        header("Location: students.php");
+        exit;
+    }
+    // ------------------------------------------------------------------------------------------------
+    // END OF UPDATED BULK ADD STUDENTS LOGIC
+    // ------------------------------------------------------------------------------------------------
+    
     if ($_POST['action'] === 'delete_student') {
-        $student_id = trim($_POST['student_id'] ?? ''); // Student ID is now a string
-        
-        if (!empty($student_id)) { // Check if ID is not empty
+        // ... (Delete logic remains unchanged)
+        $student_id = trim($_POST['student_id'] ?? '');
+
+        if (!empty($student_id)) {
             $sql_select = "SELECT s.first_name, s.last_name, s.middle_initial, sec.year, sec.name as section_name, sec.teacher FROM students s JOIN sections sec ON s.section_id = sec.id WHERE s.id = ?";
             $deleted_details = null;
 
             if ($stmt_select = $conn->prepare($sql_select)) {
-                $stmt_select->bind_param("s", $student_id); // Changed 'i' to 's'
+                $stmt_select->bind_param("s", $student_id); 
                 $stmt_select->execute();
                 $result_select = $stmt_select->get_result();
                 $deleted_details = $result_select->fetch_assoc();
@@ -178,7 +376,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if ($deleted_details) {
                 $sql_delete = "DELETE FROM students WHERE id = ?";
                 if ($stmt_delete = $conn->prepare($sql_delete)) {
-                    $stmt_delete->bind_param("s", $student_id); // Changed 'i' to 's'
+                    $stmt_delete->bind_param("s", $student_id); 
                     if ($stmt_delete->execute()) {
                         
                         $mi = $deleted_details['middle_initial'];
@@ -193,26 +391,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         header("Location: students.php");
                         exit;
                     } else {
-                        $add_error = "ERROR: Could not delete student. " . $stmt_delete->error;
+                        $_SESSION['add_error_details'] = "ERROR: Could not delete student. " . $stmt_delete->error;
                     }
                     $stmt_delete->close();
                 } else {
-                    $add_error = "ERROR: Could not prepare delete statement. " . $conn->error;
+                    $_SESSION['add_error_details'] = "ERROR: Could not prepare delete statement. " . $conn->error;
                 }
             } else {
-                $add_error = "ERROR: Student not found for deletion.";
+                $_SESSION['add_error_details'] = "ERROR: Student not found for deletion.";
             }
         }
+        header("Location: students.php");
+        exit;
     }
     
     if ($_POST['action'] === 'fetch_edit_data') {
-        $student_id = trim($_POST['student_id'] ?? ''); // Student ID is now a string
+        // ... (Fetch edit data logic remains unchanged)
+        $student_id = trim($_POST['student_id'] ?? ''); 
         
-        if (!empty($student_id)) { // Check if ID is not empty
+        if (!empty($student_id)) { 
             $sql_fetch_student = "SELECT id, first_name, last_name, middle_initial, section_id, date_of_birth FROM students WHERE id = ?";
             
             if ($stmt_fetch = $conn->prepare($sql_fetch_student)) {
-                $stmt_fetch->bind_param("s", $student_id); // Changed 'i' to 's'
+                $stmt_fetch->bind_param("s", $student_id);
                 if ($stmt_fetch->execute()) {
                     $result_fetch = $stmt_fetch->get_result();
                     $student_data = $result_fetch->fetch_assoc();
@@ -223,34 +424,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         header("Location: students.php");
                         exit;
                     } else {
-                        $add_error = "ERROR: Student not found for editing.";
+                        $_SESSION['add_error_details'] = "ERROR: Student not found for editing.";
                     }
                 } else {
-                    $add_error = "ERROR: Could not fetch student data for editing. " . $stmt_fetch->error;
+                    $_SESSION['add_error_details'] = "ERROR: Could not fetch student data for editing. " . $stmt_fetch->error;
                 }
             } else {
-                $add_error = "ERROR: Could not prepare fetch statement for editing. " . $conn->error;
+                $_SESSION['add_error_details'] = "ERROR: Could not prepare fetch statement for editing. " . $conn->error;
             }
         }
+         header("Location: students.php");
+         exit;
     }
 
     if ($_POST['action'] === 'edit_student') {
-        $student_id = trim($_POST['student_id'] ?? ''); // Student ID is now a string
+        // ... (Edit logic remains unchanged)
+        $student_id = trim($_POST['student_id'] ?? ''); 
         $first_name = trim($_POST['first_name'] ?? '');
         $last_name = trim($_POST['last_name'] ?? '');
         $middle_initial = trim($_POST['middle_initial'] ?? '');
         $section_id = (int)($_POST['section_id'] ?? 0);
         $date_of_birth = trim($_POST['date_of_birth'] ?? '');
 
-        if (empty($student_id) || empty($first_name) || empty($last_name) || $section_id <= 0 || empty($date_of_birth)) { // Check for empty string ID
-            $add_error = "All required student fields and ID are required for update.";
+        if (empty($student_id) || empty($first_name) || empty($last_name) || $section_id <= 0 || empty($date_of_birth)) {
+            $_SESSION['add_error_details'] = "All required student fields and ID are required for update.";
         } else {
             $middle_initial = empty($middle_initial) ? null : strtoupper(substr($middle_initial, 0, 1));
             
             $sql = "UPDATE students SET first_name = ?, last_name = ?, middle_initial = ?, section_id = ?, date_of_birth = ? WHERE id = ?";
             
             if ($stmt = $conn->prepare($sql)) {
-                // Changed binding types: first 5 are strings/ints, last one is 's' for student_id
                 $stmt->bind_param("sssisss", $param_first_name, $param_last_name, $param_middle_initial, $param_section_id, $param_dob, $param_id);
                 
                 $param_first_name = $first_name;
@@ -274,13 +477,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     header("Location: students.php");
                     exit;
                 } else {
-                    $add_error = "ERROR: Could not execute the update statement. " . $stmt->error;
+                    $_SESSION['add_error_details'] = "ERROR: Could not execute the update statement. " . $stmt->error;
                 }
                 $stmt->close();
             } else {
-                $add_error = "ERROR: Could not prepare the update statement. " . $conn->error;
+                $_SESSION['add_error_details'] = "ERROR: Could not prepare the update statement. " . $conn->error;
             }
         }
+         header("Location: students.php");
+         exit;
     }
 }
 
@@ -298,14 +503,13 @@ if ($selected_section_id !== 'all' && is_numeric($selected_section_id)) {
 
 if (!empty($search_term)) {
     $search_pattern = '%' . $search_term . '%';
-    // Added s.id to the search clause
     $where_clauses[] = "(s.first_name LIKE ? OR s.last_name LIKE ? OR CONCAT(s.first_name, ' ', s.last_name) LIKE ? OR CONCAT(s.last_name, ' ', s.first_name) LIKE ? OR s.id LIKE ?)";
     $params[] = $search_pattern;
     $params[] = $search_pattern;
     $params[] = $search_pattern;
     $params[] = $search_pattern;
-    $params[] = $search_pattern; // Added search by the new ID format
-    $types .= 'sssss'; // Added 's' for the new ID search
+    $params[] = $search_pattern; 
+    $types .= 'sssss'; 
 }
 
 if (!empty($where_clauses)) {
@@ -343,12 +547,10 @@ if ($stmt = $conn->prepare($sql_fetch)) {
 if (!empty($students)) {
     $student_ids = array_column($students, 'id');
     
-    // Using placeholders for prepared statement with dynamic string IDs
     $in_clause_placeholders = implode(',', array_fill(0, count($student_ids), '?'));
     
     $sql_fetch_grades = "SELECT student_id, quarter, grade FROM grades WHERE student_id IN ($in_clause_placeholders)";
 
-    // All student IDs are now strings ('s')
     $types_grades = str_repeat('s', count($student_ids)); 
 
     if ($stmt_grades = $conn->prepare($sql_fetch_grades)) {
@@ -441,10 +643,14 @@ include '../components/sidebar.php';
         </button>
     </header>
 
-    <?php if ($add_error || $fetch_error): ?>
+    <?php 
+    // Display Errors
+    if ($add_error_details || $fetch_error): 
+        $display_error = $add_error_details ?? $fetch_error;
+    ?>
         <div class="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 flex items-center space-x-2 shadow-sm" role="alert">
             <i data-lucide="alert-triangle" class="w-5 h-5 flex-shrink-0"></i>
-            <span><?php echo $add_error ?? $fetch_error; ?></span>
+            <span><?php echo $display_error; ?></span>
         </div>
     <?php endif; ?>
 
@@ -562,6 +768,7 @@ include '../components/delete_confirmation_modal.php';
 $success_json = json_encode($add_success_details);
 $edit_success_json = json_encode($edit_success_details);
 $delete_success_json = json_encode($delete_success_details);
+$bulk_success_json = json_encode($bulk_success_details);
 $edit_data_json = json_encode($student_to_edit);
 
 $sections_list_json = json_encode($sections_list);
@@ -570,6 +777,7 @@ $sections_list_json = json_encode($sections_list);
 echo "<script>const successDetails = {$success_json};</script>";
 echo "<script>const editSuccessDetails = {$edit_success_json};</script>"; 
 echo "<script>const deleteSuccessDetails = {$delete_success_json};</script>"; 
+echo "<script>const bulkSuccessDetails = {$bulk_success_json};</script>"; 
 echo "<script>const studentToEdit = {$edit_data_json};</script>"; 
 echo "<script>const sectionsList = {$sections_list_json};</script>";
 
