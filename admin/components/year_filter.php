@@ -97,7 +97,7 @@ $display_name = ($selected_year === 'all') ? 'All Years' : $selected_year;
 
         if (overlay) {
             if (loadingText) {
-                loadingText.textContent = 'Loading Sections...'; // Set the default filter message
+                loadingText.textContent = 'Loading Sections by Year...'; // Set a more specific filter message
             }
             overlay.classList.remove('hidden');
             // Give a moment for the browser to paint the overlay before redirecting

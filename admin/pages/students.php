@@ -55,7 +55,9 @@ if ($selected_section_id !== 'all' && is_numeric($selected_section_id)) {
     $types .= 'i';
 }
 
-$sql_fetch .= $where_clause . " ORDER BY s.last_name ASC, s.first_name ASC";
+// *** MODIFICATION: Changed ORDER BY to sort by Section Year and Name first ***
+$sql_fetch .= $where_clause . " ORDER BY sec.year ASC, sec.name ASC, s.last_name ASC, s.first_name ASC";
+
 
 if ($stmt = $conn->prepare($sql_fetch)) {
     if (!empty($params)) {
@@ -106,14 +108,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             
             if ($stmt->execute()) {
                 // Get section details for the success message
-                // FIX: Added 'teacher' to the fallback array
                 $section_info = $sections_list[$section_id] ?? ['name' => 'N/A', 'year' => 'N/A', 'teacher' => 'N/A'];
                 
                 $_SESSION['add_success_details'] = [
                     'name' => $first_name . ' ' . $last_name,
                     'section_name' => $section_info['name'],
                     'section_year' => $section_info['year'],
-                    'teacher_name' => $section_info['teacher'] // FIX: Added the teacher's name
+                    'teacher_name' => $section_info['teacher']
                 ];
                 header("Location: students.php");
                 exit;
