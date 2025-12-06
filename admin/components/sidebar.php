@@ -56,7 +56,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <span>Parents</span>
         </a>
 
-        <a href="teachers.php" class="flex items-center space-x-3 p-3 rounded-lg transition duration-150 focus:outline-none focus:ring-2 focus:ring-white/50
+        <a href="../pages/teachers.php" class="flex items-center space-x-3 p-3 rounded-lg transition duration-150 focus:outline-none focus:ring-2 focus:ring-white/50
             <?php echo ($current_page == 'teachers.php') ? 'bg-white bg-opacity-20 text-white' : 'text-white hover:bg-primary-hover'; ?>">
             <i data-lucide="graduation-cap" class="w-5 h-5"></i>
             <span>Teachers</span>

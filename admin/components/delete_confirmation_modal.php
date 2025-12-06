@@ -1,5 +1,4 @@
 <?php
-// components/delete_confirmation_modal.php
 ?>
 
 <div id="deleteConfirmationModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity duration-300 hidden" aria-modal="true" role="dialog" aria-labelledby="delete-modal-title">

@@ -452,17 +452,26 @@ function handleSectionSelect(listItem, modalType = 'add') {
     const sectionId = listItem.getAttribute('data-value');
     const sectionDisplay = listItem.getAttribute('data-display');
     
+    // Check your browser's console after clicking an option. If this message appears, 
+    // the function is running correctly and the issue is visual.
+    console.log('Attempting to set selected section:', sectionDisplay, 'with ID:', sectionId);
+    
     const idPrefix = modalType === 'edit' ? 'edit_' : 'modal_';
     const buttonTextId = modalType === 'edit' ? 'edit-selected-section-text' : 'selected-section-text';
     const optionsListId = modalType === 'edit' ? 'edit-section-options-list' : 'section-options-list';
     
+    // 1. Update the hidden input field for form submission
     document.getElementById(idPrefix + 'section_id').value = sectionId;
     
+    // 2. Update the visible text on the button
     const buttonTextSpan = document.getElementById(buttonTextId);
     buttonTextSpan.textContent = sectionDisplay;
+    
+    // This is the key part to switch from placeholder gray to dark text
     buttonTextSpan.classList.remove('text-gray-400');
     buttonTextSpan.classList.add('text-gray-900');
 
+    // 3. Highlight the selected item and close the list
     const optionsList = document.getElementById(optionsListId);
     
     optionsList.querySelectorAll('li').forEach(li => {
