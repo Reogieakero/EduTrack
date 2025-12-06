@@ -20,7 +20,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const successModalContent = document.getElementById('successModalContent');
     const closeSuccessModalBtn = document.getElementById('closeSuccessModalBtn');
     
-    // ADDED CONSTANT
     const modalDetailBlock = document.getElementById('modal-detail-block');
 
     const addStudentForm = document.getElementById('addStudentForm');
@@ -313,7 +312,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     else if (typeof bulkSuccessDetails !== 'undefined' && bulkSuccessDetails && (bulkSuccessDetails.added > 0 || bulkSuccessDetails.failed > 0)) {
         detailsToShow = bulkSuccessDetails;
-        // User request: "Bulk uploaded successfully"
         modalTitle = 'Bulk Enrollment Complete!'; 
         modalDescription = `Successfully added ${detailsToShow.added} students. ${detailsToShow.failed} students failed to enroll.`;
         
@@ -340,7 +338,6 @@ document.addEventListener('DOMContentLoaded', function() {
             successModalDescription.innerHTML = modalDescription; 
         }
         
-        // NEW LOGIC TO HIDE/SHOW DETAILS BLOCK
         if (modalDetailBlock) {
             if (typeof bulkSuccessDetails !== 'undefined' && bulkSuccessDetails && (bulkSuccessDetails.added > 0 || bulkSuccessDetails.failed > 0)) {
                 modalDetailBlock.classList.add('hidden');
