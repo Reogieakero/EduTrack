@@ -43,8 +43,25 @@ if ($stmt_sections = $conn->prepare($sql_fetch_sections)) {
 }
 
 // 4. Student Data Fetching
-// Assumes a 'students' table with id, first_name, last_name, section_id, date_of_birth, enrollment_date
-$sql_fetch = "SELECT s.*, sec.year as section_year, sec.name as section_name FROM students s JOIN sections sec ON s.section_id = sec.id";
+// *** MODIFICATION START: Updated SQL query to include quarterly grades ***
+$sql_fetch = "
+    SELECT 
+        s.*, 
+        sec.year as section_year, 
+        sec.name as section_name,
+        g1.grade AS q1_grade,
+        g2.grade AS q2_grade,
+        g3.grade AS q3_grade,
+        g4.grade AS q4_grade
+    FROM students s 
+    JOIN sections sec ON s.section_id = sec.id
+    LEFT JOIN grades g1 ON s.id = g1.student_id AND s.section_id = g1.section_id AND g1.quarter = 'Q1'
+    LEFT JOIN grades g2 ON s.id = g2.student_id AND s.section_id = g2.section_id AND g2.quarter = 'Q2'
+    LEFT JOIN grades g3 ON s.id = g3.student_id AND s.section_id = g3.section_id AND g3.quarter = 'Q3'
+    LEFT JOIN grades g4 ON s.id = g4.student_id AND s.section_id = g4.section_id AND g4.quarter = 'Q4'
+";
+// *** MODIFICATION END ***
+
 $where_clause = '';
 $params = [];
 $types = '';
@@ -210,13 +227,17 @@ include '../components/sidebar.php';
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Section / Year</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date of Birth</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Q1</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Q2</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Q3</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Q4</th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                 <?php if (empty($students)): ?>
                     <tr>
-                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">No students found for this filter.</td>
+                        <td colspan="9" class="px-6 py-12 text-center text-gray-500">No students found for this filter.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($students as $student): ?>
@@ -225,6 +246,10 @@ include '../components/sidebar.php';
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-primary-blue"><?php echo htmlspecialchars($student['last_name'] . ', ' . $student['first_name']); ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo htmlspecialchars($student['section_year'] . ' - ' . $student['section_name']); ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo date('M d, Y', strtotime($student['date_of_birth'])); ?></td>
+                            <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-700 text-center"><?php echo htmlspecialchars($student['q1_grade'] ?? '-'); ?></td>
+                            <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-700 text-center"><?php echo htmlspecialchars($student['q2_grade'] ?? '-'); ?></td>
+                            <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-700 text-center"><?php echo htmlspecialchars($student['q3_grade'] ?? '-'); ?></td>
+                            <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-700 text-center"><?php echo htmlspecialchars($student['q4_grade'] ?? '-'); ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                                 <button onclick="initiateEditAction(<?php echo $student['id']; ?>)" class="text-primary-blue hover:text-blue-700 transition duration-150 p-1 rounded-md">
                                     <i data-lucide="square-pen" class="w-5 h-5"></i>
