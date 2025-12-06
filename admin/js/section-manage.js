@@ -35,7 +35,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const editSectionIdInput = document.getElementById('edit_section_id');
     const editNameInput = document.getElementById('edit_modal_section_name');
     const editYearInput = document.getElementById('edit_modal_section_year');
-    const editTeacherInput = document.getElementById('edit_modal_teacher_name');
+    // START: MODIFIED Teacher Dropdown reference
+    const editTeacherSelect = document.getElementById('edit_modal_teacher_name');
+    // END: MODIFIED Teacher Dropdown reference
     
     // --- Delete Modal (Generic) ---
     const deleteModal = document.getElementById('deleteConfirmationModal');
@@ -158,12 +160,47 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => {
             editSectionIdInput.value = sectionData.id;
             editNameInput.value = sectionData.name || '';
-            editTeacherInput.value = sectionData.teacher || '';
 
             const yearRadio = document.getElementById('edit_year_' + (sectionData.year || '').replace(' ', '_'));
             if (yearRadio) {
                 yearRadio.checked = true;
             }
+
+            // START: Logic to populate and select teacher dropdown
+            if (editTeacherSelect) {
+                editTeacherSelect.innerHTML = ''; // Clear existing options
+                const currentTeacherName = sectionData.teacher || 'Unassigned';
+
+                // 1. Add Unassigned option
+                const unassignedOption = document.createElement('option');
+                unassignedOption.value = 'Unassigned';
+                unassignedOption.textContent = 'Unassigned (No Teacher)';
+                editTeacherSelect.appendChild(unassignedOption);
+                
+                // 2. Add Teachers: current teacher (if assigned) and all unassigned teachers
+                if (typeof allTeachers !== 'undefined' && Array.isArray(allTeachers)) {
+                    allTeachers.forEach(teacher => {
+                        // Check if the teacher is currently unassigned (assigned_section_id is 0)
+                        // OR if the teacher is the one currently assigned to THIS section (by name)
+                        // NOTE: teacher.assigned_section_id is the ID of the section they are assigned to, 0 if unassigned.
+                        const isUnassigned = parseInt(teacher.assigned_section_id) === 0;
+                        const isCurrentTeacher = teacher.full_name === currentTeacherName;
+
+                        if (isUnassigned || isCurrentTeacher) {
+                            const option = document.createElement('option');
+                            option.value = teacher.full_name;
+                            option.textContent = teacher.full_name;
+                            editTeacherSelect.appendChild(option);
+                        }
+                    });
+                } else {
+                    console.error("Teacher data (allTeachers) not found in scope.");
+                }
+
+                // 3. Select the current teacher/Unassigned option
+                editTeacherSelect.value = currentTeacherName;
+            }
+            // END: Logic to populate and select teacher dropdown
 
             hideLoadingOverlay();
             openModal(editModal, editModalContent);
@@ -239,7 +276,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 
-    // --- Success Details Display Logic ---
+    // --- Success Details Display Logic (MODIFIED) ---
     let detailsToShow = null;
     let modalTitle = 'Success';
     let modalDescription = '';
@@ -275,9 +312,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (document.getElementById('modalSectionYear')) {
              document.getElementById('modalSectionYear').textContent = detailsToShow.year || 'N/A';
         }
-        if (document.getElementById('modalTeacherName')) {
-             document.getElementById('modalTeacherName').textContent = detailsToShow.teacher || 'N/A';
+        
+        // START: NEW LOGIC FOR TEACHER ASSIGNMENT
+        if (document.getElementById('modalSectionTeacher')) {
+             const assignedTeacher = detailsToShow.teacher || 'Unassigned';
+             document.getElementById('modalSectionTeacher').textContent = assignedTeacher;
         }
+        // END: NEW LOGIC FOR TEACHER ASSIGNMENT
         
         if (addSectionForm) {
             addSectionForm.reset(); 

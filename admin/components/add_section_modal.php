@@ -36,9 +36,27 @@
                 
                 <div>
                     <label for="modal_teacher_name" class="block text-sm font-medium text-gray-700 mb-1">Assigned Teacher</label>
-                    <input type="text" id="modal_teacher_name" name="teacher_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue transition duration-150 shadow-sm" placeholder="e.g., Mr. Jonathan Doe">
+                    <select id="modal_teacher_name" name="teacher_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue transition duration-150 shadow-sm bg-white">
+                        <option value="" disabled selected>Select a Teacher</option>
+                        <option value="Unassigned">Unassigned (No Teacher)</option>
+                        <?php 
+                        // Assuming $all_teachers is available from sections.php
+                        if (isset($all_teachers)):
+                            foreach ($all_teachers as $teacher):
+                                // Only show teachers who are currently unassigned (assigned_section_id is 0 or NULL)
+                                if ((int)$teacher['assigned_section_id'] === 0):
+                        ?>
+                        <option value="<?php echo htmlspecialchars($teacher['full_name']); ?>">
+                            <?php echo htmlspecialchars($teacher['full_name']); ?>
+                        </option>
+                        <?php 
+                                endif;
+                            endforeach; 
+                        endif;
+                        ?>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500">Only currently unassigned teachers are available for selection.</p>
                 </div>
-
                 <div class="pt-4 border-t flex justify-end">
                     <button type="submit" id="saveSectionBtn" class="w-full sm:w-auto bg-primary-blue hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-lg transition duration-150 shadow-md flex items-center justify-center space-x-2">
                         <i data-lucide="save" class="w-5 h-5" id="saveIcon"></i>

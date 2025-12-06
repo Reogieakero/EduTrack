@@ -66,7 +66,10 @@ foreach ($sections_list as $id => $section) {
                 $is_selected = ($selected_section_id == $id);
             ?>
                 <li class="py-2 px-3 cursor-pointer text-gray-900 text-sm transition-colors duration-150
-                           <?php echo $is_selected ? 'bg-friendly-blue text-white font-semibold' : 'hover:bg-gray-100'; ?>"
+                           <?php 
+                           // CHANGED: Replaced bg-friendly-blue/text-white with neutral gray/dark text
+                           echo $is_selected ? 'bg-gray-200 text-gray-900 font-semibold' : 'hover:bg-gray-100'; 
+                           ?>"
                     role="option" 
                     aria-selected="<?php echo $is_selected ? 'true' : 'false'; ?>"
                     onclick="handleSectionFilterSelect('<?php echo htmlspecialchars($id); ?>')">
@@ -123,11 +126,9 @@ foreach ($sections_list as $id => $section) {
         }
         // --- END MODIFIED ---
         
-        // Perform the redirect/filter action
         window.location.href = 'students.php?section_id=' + section_id;
     }
 
-    // Close dropdown if user clicks outside
     document.addEventListener('click', function(event) {
         const customFilter = document.getElementById('custom-section-filter');
         if (customFilter && !customFilter.contains(event.target)) {

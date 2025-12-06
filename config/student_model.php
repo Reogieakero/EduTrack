@@ -467,6 +467,7 @@ function update_existing_student($conn, $sections_list, $post_data) {
     $sql = "UPDATE students SET first_name = ?, last_name = ?, middle_initial = ?, section_id = ?, date_of_birth = ? WHERE id = ?";
     
     if ($stmt = $conn->prepare($sql)) {
+        // FIX: The type string must be 'sssis' to match the 6 parameters: s, s, s, i, s, s (where the final 's' is for $param_id)
         $stmt->bind_param("sssis", $param_first_name, $param_last_name, $param_middle_initial, $param_section_id, $param_dob, $param_id);
         
         $param_first_name = $first_name;
@@ -495,7 +496,3 @@ function update_existing_student($conn, $sections_list, $post_data) {
         $_SESSION['add_error_details'] = "ERROR: Could not prepare the update statement. " . $conn->error;
     }
 }
-
-
-
-?>

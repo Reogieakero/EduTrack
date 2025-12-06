@@ -138,7 +138,7 @@
         const optionsList = document.getElementById(type === 'edit' ? 'edit-section-options-list' : 'section-options-list');
         const checkIconClass = type === 'edit' ? 'edit-section-check-icon' : 'section-check-icon';
         const selectButton = document.getElementById(type === 'edit' ? 'editSectionSelectButton' : 'sectionSelectButton');
-        const primaryColorClass = type === 'edit' ? 'bg-primary-blue' : 'bg-primary-green';
+        // Removed the primaryColorClass variable
 
         sectionIdInput.value = sectionId;
         buttonTextSpan.textContent = sectionDisplay;
@@ -146,14 +146,17 @@
         buttonTextSpan.classList.add('text-gray-900');
 
         optionsList.querySelectorAll('li').forEach(li => {
-            li.classList.remove('bg-primary-blue', 'bg-primary-green', 'text-white', 'font-semibold');
-            li.classList.add('hover:bg-gray-100');
+            // Removed color classes: bg-primary-blue, bg-primary-green, text-white
+            li.classList.remove('bg-primary-blue', 'bg-primary-green', 'bg-gray-200', 'text-white', 'font-semibold');
+            li.classList.add('hover:bg-gray-100', 'text-gray-900'); // Ensure hover and default text color
             const checkIcon = li.querySelector(`.${checkIconClass}`);
             if (checkIcon) checkIcon.classList.add('hidden');
         });
 
-        listItem.classList.add(primaryColorClass, 'text-white', 'font-semibold');
-        listItem.classList.remove('hover:bg-gray-100');
+        // Use neutral gray background for selection
+        listItem.classList.add('bg-gray-200', 'font-semibold', 'text-gray-900'); 
+        // Removed hover:bg-gray-100 and text-white classes
+        listItem.classList.remove('hover:bg-gray-100', 'text-white'); 
         const checkIcon = listItem.querySelector(`.${checkIconClass}`);
         if (checkIcon) checkIcon.classList.remove('hidden');
         

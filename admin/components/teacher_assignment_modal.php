@@ -37,7 +37,7 @@
                                         aria-expanded="false"
                                         onclick="toggleDropdown(this, 'assign')"> 
                                     
-                                    <span id="assign-selected-section-text" class="truncate text-sm text-gray-400">-- Select a Section --</span>
+                                    <span id="assign-selected-section-text" class="truncate text-sm text-gray-400">Select a Section</span>
                                     <i data-lucide="chevron-down" class="w-4 h-4 ml-2 text-gray-500"></i>
                                 </button>
                                 
@@ -50,11 +50,11 @@
                                     <li class="py-2 px-3 cursor-pointer text-gray-400 text-sm transition-colors duration-150 hover:bg-gray-100 flex justify-between items-center" 
                                         role="option" 
                                         data-value="" 
-                                        data-display="-- Select a Section --" 
+                                        data-display="Select a Section " 
                                         data-subtext="(Unassign Teacher)"
                                         onclick="handleSectionSelect(this, 'assign')">
                                         
-                                        <span>-- Select a Section --</span>
+                                        <span>Select a Section</span>
                                         <div class="text-xs text-gray-500 flex items-center">
                                             (Unassign Teacher)
                                             <i data-lucide="check" class="w-4 h-4 ml-2 align-middle hidden assign-section-check-icon text-primary-blue"></i>
@@ -87,7 +87,7 @@
                                 </ul>
                             </div>
                             <p class="mt-1 text-xs text-gray-500">
-                                Selecting an already assigned section will override the current teacher. Selecting "-- Select a Section --" will unassign the teacher.
+                                Selecting an already assigned section will override the current teacher. Selecting " Select a Section " will unassign the teacher.
                             </p>
                         </div>
                         

@@ -37,9 +37,10 @@
                 
                 <div>
                     <label for="edit_modal_teacher_name" class="block text-sm font-medium text-gray-700 mb-1">Assigned Teacher</label>
-                    <input type="text" id="edit_modal_teacher_name" name="edit_teacher_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue transition duration-150 shadow-sm" placeholder="e.g., Mr. Jonathan Doe">
+                    <select id="edit_modal_teacher_name" name="edit_teacher_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-green focus:border-primary-green transition duration-150 shadow-sm bg-white">
+                        </select>
+                    <p class="mt-1 text-xs text-gray-500">Select the teacher for this section.</p>
                 </div>
-
                 <div class="pt-4 border-t flex justify-end">
                     <button type="submit" id="updateSectionBtn" class="w-full sm:w-auto bg-primary-green hover:bg-green-700 text-white font-semibold py-2.5 px-6 rounded-lg transition duration-150 shadow-md flex items-center justify-center space-x-2">
                         <i data-lucide="check" class="w-5 h-5" id="updateIcon"></i>
