@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
     lucide.createIcons();
 
     const overlay = document.getElementById('loadingOverlay');
-    const loadingMessageText = document.getElementById('loadingMessageText'); // Get the message element
+    const loadingMessageText = document.getElementById('loadingMessageText'); 
     
     if (overlay && !overlay.classList.contains('hidden')) {
         overlay.classList.add('opacity-0');
@@ -35,6 +35,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
     const deleteItemNameSpan = document.getElementById('deleteItemName');
     const deleteItemTypeSpan = document.getElementById('deleteItemType');
+    
+    // --- Edit Modal Declarations (NEW) ---
+    const editModal = document.getElementById('editStudentModal');
+    const editModalContent = document.getElementById('editModalContent');
+    const closeEditModalBtn = document.getElementById('closeEditModalBtn');
+    
+    const editStudentForm = document.getElementById('editStudentForm');
+    const updateStudentBtn = document.getElementById('updateStudentBtn');
+    const updateIcon = document.getElementById('updateIcon');
+    const updateText = document.getElementById('updateText');
+    const updateLoadingSpinner = document.getElementById('updateLoadingSpinner');
 
 
     const openModal = (targetModal, targetContent) => {
@@ -54,7 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         setTimeout(() => {
             targetModal.classList.add('hidden');
-            if(modal.classList.contains('hidden') && successModal.classList.contains('hidden') && deleteModal.classList.contains('hidden')) {
+            if(modal.classList.contains('hidden') && successModal.classList.contains('hidden') && deleteModal.classList.contains('hidden') && (!editModal || editModal.classList.contains('hidden'))) { 
                 document.body.style.overflow = '';
             }
         }, 300); 
@@ -72,13 +83,39 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
+    // --- Edit Form Submission Handler (NEW) ---
+    if (editStudentForm) {
+        editStudentForm.addEventListener('submit', function(event) {
+            if (editStudentForm.checkValidity()) {
+                updateIcon.classList.add('hidden');
+                updateText.textContent = 'Saving...';
+                updateLoadingSpinner.classList.remove('hidden');
+                updateStudentBtn.disabled = true; 
+                updateStudentBtn.classList.remove('hover:bg-blue-700');
+                updateStudentBtn.classList.add('opacity-70', 'cursor-not-allowed');
+                
+                // Show loading overlay on submission
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                if (loadingOverlay) {
+                    if (loadingMessageText) {
+                        loadingMessageText.textContent = 'Updating Student...';
+                    }
+                    loadingOverlay.classList.remove('hidden');
+                    setTimeout(() => {
+                        loadingOverlay.classList.remove('opacity-0');
+                    }, 10);
+                }
+            }
+        });
+    }
 
     // --- Event Listeners ---
     if (openBtn) openBtn.addEventListener('click', () => openModal(modal, modalContent));
     if (closeBtn) closeBtn.addEventListener('click', () => closeModal(modal, modalContent));
     if (closeSuccessModalBtn) closeSuccessModalBtn.addEventListener('click', () => closeModal(successModal, successModalContent));
     if (cancelDeleteBtn) cancelDeleteBtn.addEventListener('click', () => closeModal(deleteModal, deleteModalContent)); 
-
+    if (closeEditModalBtn) closeEditModalBtn.addEventListener('click', () => closeModal(editModal, editModalContent)); // NEW
 
     if (modal) modal.addEventListener('click', (e) => {
         if (e.target === modal) { closeModal(modal, modalContent); }
@@ -89,10 +126,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if (deleteModal) deleteModal.addEventListener('click', (e) => {
         if (e.target === deleteModal) { closeModal(deleteModal, deleteModalContent); }
     });
+    if (editModal) editModal.addEventListener('click', (e) => { // NEW
+        if (e.target === editModal) { closeModal(editModal, editModalContent); }
+    });
     
     // --- Delete Confirmation (Generic Modal Opener) ---
     window.confirmDeleteAction = function(itemId, itemName) {
-        // Hardcode itemType as 'student' since the PHP call only passes two args
         const itemType = 'student'; 
         
         deleteItemNameSpan.textContent = itemName;
@@ -114,13 +153,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show the loading overlay before submitting the form
                 const loadingOverlay = document.getElementById('loadingOverlay');
                 if (loadingOverlay) {
-                    // Set the specific message for deletion
                     if (loadingMessageText) {
                         loadingMessageText.textContent = 'Deleting Student...';
                     }
                     
                     loadingOverlay.classList.remove('hidden');
-                    // Use setTimeout to ensure the transition is triggered
                     setTimeout(() => {
                         loadingOverlay.classList.remove('opacity-0');
                     }, 10);
@@ -146,8 +183,31 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- Initiate Edit Action (NEW) ---
     window.initiateEditAction = function(studentId) {
-        alert("Edit feature placeholder for student ID: " + studentId);
+        // Show the loading overlay before submitting the form to fetch data
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) {
+            if (loadingMessageText) {
+                loadingMessageText.textContent = 'Preparing Edit Form...';
+            }
+            loadingOverlay.classList.remove('hidden');
+            setTimeout(() => {
+                loadingOverlay.classList.remove('opacity-0');
+            }, 10);
+        }
+        
+        // Submit a temporary form to students.php to fetch the student's data and redirect
+        const tempForm = document.createElement('form');
+        tempForm.method = 'POST';
+        tempForm.action = 'students.php'; 
+        tempForm.innerHTML = `
+            <input type="hidden" name="action" value="fetch_edit_data">
+            <input type="hidden" name="student_id" value="${studentId}">
+        `;
+        
+        document.body.appendChild(tempForm);
+        tempForm.submit();
     };
 
 
@@ -159,6 +219,12 @@ document.addEventListener('DOMContentLoaded', function() {
         detailsToShow = successDetails;
         modalTitle = 'Student Enrolled Successfully!';
         modalDescription = `${detailsToShow.name} was successfully enrolled into ${detailsToShow.section_year} - ${detailsToShow.section_name}.`;
+    } 
+    // --- Edit Success Details (NEW) ---
+    else if (typeof editSuccessDetails !== 'undefined' && editSuccessDetails && editSuccessDetails.name) {
+        detailsToShow = editSuccessDetails;
+        modalTitle = 'Student Updated Successfully!';
+        modalDescription = `${detailsToShow.name}'s record was successfully updated.`;
     } 
     else if (typeof deleteSuccessDetails !== 'undefined' && deleteSuccessDetails && deleteSuccessDetails.name) {
         detailsToShow = deleteSuccessDetails;
@@ -199,5 +265,49 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         openModal(successModal, successModalContent);
+    }
+    
+    // --- Handle Student To Edit (NEW) ---
+    if (typeof studentToEdit !== 'undefined' && studentToEdit && studentToEdit.id) {
+        // Wait 500ms for visual consistency with section editing before showing the modal
+        setTimeout(() => {
+            // Fill the form fields
+            document.getElementById('edit_student_id').value = studentToEdit.id;
+            document.getElementById('edit_first_name').value = studentToEdit.first_name;
+            document.getElementById('edit_last_name').value = studentToEdit.last_name;
+            document.getElementById('edit_date_of_birth').value = studentToEdit.date_of_birth;
+            
+            const currentSectionId = studentToEdit.section_id.toString();
+            
+            // Find the selected section list item
+            const selectedOption = document.querySelector(`#edit-section-options-list li[data-value="${currentSectionId}"]`);
+            
+            // Check if handleSectionSelect function is globally available (it should be from edit_student_modal.php)
+            if (selectedOption && typeof handleSectionSelect === 'function') {
+                // Use the generalized handleSectionSelect function to set the dropdown state
+                handleSectionSelect(selectedOption, 'edit');
+            } else {
+                 // Fallback for setting input value if function is not available
+                 document.getElementById('edit_section_id').value = currentSectionId;
+                 const sectionInfo = sectionsList[currentSectionId];
+                 if (sectionInfo) {
+                    const sectionDisplay = `${sectionInfo.year} - ${sectionInfo.name} (Teacher: ${sectionInfo.teacher})`;
+                    document.getElementById('edit-selected-section-text').textContent = sectionDisplay;
+                    document.getElementById('edit-selected-section-text').classList.remove('text-gray-400');
+                    document.getElementById('edit-selected-section-text').classList.add('text-gray-900');
+                 }
+            }
+
+            // Hide loading overlay
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            if (loadingOverlay) {
+                loadingOverlay.classList.add('opacity-0');
+                setTimeout(() => {
+                    loadingOverlay.classList.add('hidden');
+                }, 300);
+            }
+            
+            openModal(editModal, editModalContent);
+        }, 500); // <-- Consistent 500ms delay added here
     }
 });

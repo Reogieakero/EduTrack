@@ -4,7 +4,6 @@ if (!isset($section)) {
     return;
 }
 
-// Ensure $section['students'] is an array for count operation
 $student_count = $section['student_count'] ?? count($section['students'] ?? []);
 $teacher_display = htmlspecialchars($section['teacher'] ?? 'Unassigned');
 $year_display = htmlspecialchars($section['year'] ?? 'N/A');
@@ -21,6 +20,15 @@ if ($created_at_timestamp) {
     }
 }
 
+$section_data_json = json_encode([
+    'id' => $section['id'] ?? null,
+    'name' => $section['name'] ?? '',
+    'year' => $section['year'] ?? '',
+    'teacher' => $section['teacher'] ?? ''
+]);
+
+$js_safe_section_data = htmlspecialchars($section_data_json, ENT_QUOTES, 'UTF-8');
+
 ?>
 <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-200 transition duration-300 hover:shadow-xl">
     <div class="flex justify-between items-start mb-4 pb-4 border-b">
@@ -29,7 +37,7 @@ if ($created_at_timestamp) {
                 <h3 class="text-2xl font-bold text-gray-900"><?php echo htmlspecialchars($section['name']); ?></h3>
                 
                 <button 
-                    onclick="initiateEditAction('<?php echo htmlspecialchars($section['id']); ?>')"
+                    onclick="initiateEditAction('<?php echo htmlspecialchars($section['id']); ?>', '<?php echo $js_safe_section_data; ?>')"
                     class="text-gray-400 hover:text-primary-blue p-1 rounded-full transition duration-150" 
                     title="Edit Section">
                     <i data-lucide="pencil" class="w-4 h-4"></i>

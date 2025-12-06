@@ -26,6 +26,7 @@ if (isset($_SESSION['delete_success_details'])) {
     $delete_success_details = $_SESSION['delete_success_details'];
     unset($_SESSION['delete_success_details']);
 }
+// Variable to hold student data for pre-filling the edit modal
 $student_to_edit = null; 
 if (isset($_SESSION['student_to_edit'])) {
     $student_to_edit = $_SESSION['student_to_edit'];
@@ -39,6 +40,7 @@ $add_error = false;
 $fetch_error = false;
 
 // 3. Filtering and Selection
+// This variable MUST be defined for section_filter.php to work correctly.
 $selected_section_id = $_GET['section_id'] ?? 'all';
 
 // Fetch all sections for filter and add/edit forms
@@ -47,6 +49,7 @@ if ($stmt_sections = $conn->prepare($sql_fetch_sections)) {
     if ($stmt_sections->execute()) {
         $result_sections = $stmt_sections->get_result();
         while ($row = $result_sections->fetch_assoc()) {
+            // Store section data using ID as key
             $sections_list[$row['id']] = $row;
         }
     }
@@ -54,7 +57,7 @@ if ($stmt_sections = $conn->prepare($sql_fetch_sections)) {
 }
 
 
-// 5. POST Request Handling (Add/Delete Student)
+// 5. POST Request Handling (Add/Delete/Edit Student)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     
     // --- Handle Add Student ---
@@ -140,6 +143,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
             } else {
                 $add_error = "ERROR: Student not found for deletion.";
+            }
+        }
+    }
+    
+    // --- Handle Fetch Edit Data ---
+    if ($_POST['action'] === 'fetch_edit_data') {
+        $student_id = (int)($_POST['student_id'] ?? 0);
+        
+        if ($student_id > 0) {
+            // Select all necessary fields for the edit form
+            $sql_fetch_student = "SELECT id, first_name, last_name, section_id, date_of_birth FROM students WHERE id = ?";
+            
+            if ($stmt_fetch = $conn->prepare($sql_fetch_student)) {
+                $stmt_fetch->bind_param("i", $student_id);
+                if ($stmt_fetch->execute()) {
+                    $result_fetch = $stmt_fetch->get_result();
+                    $student_data = $result_fetch->fetch_assoc();
+                    $stmt_fetch->close();
+                    
+                    if ($student_data) {
+                        // Store student data in session to be picked up by JS on redirect
+                        $_SESSION['student_to_edit'] = $student_data;
+                        // Redirect back to students.php to render the modal with pre-filled data
+                        header("Location: students.php");
+                        exit;
+                    } else {
+                        $add_error = "ERROR: Student not found for editing.";
+                    }
+                } else {
+                    $add_error = "ERROR: Could not fetch student data for editing. " . $stmt_fetch->error;
+                }
+            } else {
+                $add_error = "ERROR: Could not prepare fetch statement for editing. " . $conn->error;
+            }
+        }
+    }
+
+    // --- Handle Edit Student Submission ---
+    if ($_POST['action'] === 'edit_student') {
+        $student_id = (int)($_POST['student_id'] ?? 0);
+        $first_name = trim($_POST['first_name'] ?? '');
+        $last_name = trim($_POST['last_name'] ?? '');
+        $section_id = (int)($_POST['section_id'] ?? 0);
+        $date_of_birth = trim($_POST['date_of_birth'] ?? '');
+
+        // Basic validation
+        if ($student_id <= 0 || empty($first_name) || empty($last_name) || $section_id <= 0 || empty($date_of_birth)) {
+            $add_error = "All student fields and ID are required for update.";
+        } else {
+            $sql = "UPDATE students SET first_name = ?, last_name = ?, section_id = ?, date_of_birth = ? WHERE id = ?";
+            
+            if ($stmt = $conn->prepare($sql)) {
+                $stmt->bind_param("ssisi", $param_first_name, $param_last_name, $param_section_id, $param_dob, $param_id);
+                
+                $param_first_name = $first_name;
+                $param_last_name = $last_name;
+                $param_section_id = $section_id;
+                $param_dob = $date_of_birth;
+                $param_id = $student_id;
+                
+                if ($stmt->execute()) {
+                    // Get section details for the success message
+                    $section_info = $sections_list[$section_id] ?? ['name' => 'N/A', 'year' => 'N/A', 'teacher' => 'N/A'];
+                    
+                    $_SESSION['edit_success_details'] = [
+                        'name' => $first_name . ' ' . $last_name,
+                        'section_name' => $section_info['name'],
+                        'section_year' => $section_info['year'],
+                        'teacher_name' => $section_info['teacher']
+                    ];
+                    header("Location: students.php");
+                    exit;
+                } else {
+                    $add_error = "ERROR: Could not execute the update statement. " . $stmt->error;
+                }
+                $stmt->close();
+            } else {
+                $add_error = "ERROR: Could not prepare the update statement. " . $conn->error;
             }
         }
     }
@@ -256,8 +337,8 @@ include '../components/sidebar.php';
                 <span>All Students (<?php echo count($students); ?>)</span>
             </h2>
 
-            <?php // Assuming section_filter.php exists ?>
-            </div>
+            <?php include '../components/section_filter.php'; ?>
+        </div>
 
         <div class="bg-white rounded-xl shadow-lg overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
@@ -302,6 +383,7 @@ include '../components/sidebar.php';
 <?php 
 // Include necessary modal components
 include '../components/add_student_modal.php'; 
+include '../components/edit_student_modal.php'; // <-- NEW
 include '../components/success_modal.php'; 
 include '../components/delete_confirmation_modal.php'; 
 
@@ -318,7 +400,7 @@ $sections_list_json = json_encode($sections_list);
 echo "<script>const successDetails = {$success_json};</script>";
 echo "<script>const editSuccessDetails = {$edit_success_json};</script>"; 
 echo "<script>const deleteSuccessDetails = {$delete_success_json};</script>"; 
-echo "<script>const studentToEdit = {$edit_data_json};</script>";
+echo "<script>const studentToEdit = {$edit_data_json};</script>"; 
 echo "<script>const sectionsList = {$sections_list_json};</script>";
 
 ?>

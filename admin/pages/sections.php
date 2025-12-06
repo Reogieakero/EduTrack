@@ -53,7 +53,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']))) {
     $action_to_perform = $_POST['action'];
     $section_id = (int)($_POST['section_id'] ?? 0);
 
-    // --- Handle Add Section ---
     if ($action_to_perform === 'add_section') {
         $new_section_name = trim($_POST['section_name'] ?? '');
         $new_teacher_name = trim($_POST['teacher_name'] ?? '');
@@ -91,7 +90,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']))) {
     }
 
 
-    // --- Handle Delete Section (The logic that needed to be executed) ---
     if ($action_to_perform === 'delete_section' && $section_id > 0) {
         $sql_select = "SELECT year, name, teacher FROM sections WHERE id = ?";
         $deleted_details = null;
@@ -105,20 +103,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']))) {
         }
 
         if ($deleted_details) {
-            // FIX: Step 1: Delete all associated students first to satisfy the FK constraint
             $sql_delete_students = "DELETE FROM students WHERE section_id = ?";
             if ($stmt_delete_students = $conn->prepare($sql_delete_students)) {
                 $stmt_delete_students->bind_param("i", $section_id);
                 
                 if ($stmt_delete_students->execute()) {
-                    $stmt_delete_students->close(); // Close student statement
+                    $stmt_delete_students->close();
 
-                    // Step 2: Delete the section (Original logic continues here)
                     $sql_delete = "DELETE FROM sections WHERE id = ?";
                     if ($stmt_delete = $conn->prepare($sql_delete)) {
                         $stmt_delete->bind_param("i", $section_id);
                         
-                        // Line 111 where the error occurred before the fix
                         if ($stmt_delete->execute()) {
                             $_SESSION['delete_success_details'] = [
                                 'name' => $deleted_details['name'],
@@ -147,7 +142,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']))) {
         }
     }
     
-    // --- Handle Edit/Update Section ---
     if ($action_to_perform === 'edit_section' && $section_id > 0) {
         $sql = "SELECT id, year, name, teacher FROM sections WHERE id = ?";
         if ($stmt = $conn->prepare($sql)) {

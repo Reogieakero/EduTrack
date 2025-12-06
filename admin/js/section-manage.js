@@ -42,8 +42,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const deleteModalContent = document.getElementById('deleteModalContent');
     const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
     const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-    const deleteItemNameSpan = document.getElementById('deleteItemName'); // Renamed to generic
-    const deleteItemTypeSpan = document.getElementById('deleteItemType'); // Renamed to generic
+    const deleteItemNameSpan = document.getElementById('deleteItemName');
+    const deleteItemTypeSpan = document.getElementById('deleteItemType');
 
 
     // --- Modal Helpers ---
@@ -71,8 +71,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 300); 
     };
-
-    // --- New Loading Function to show overlay ---
+    
+    // --- Loading Overlay Functions ---
     const showLoadingOverlay = (message = 'Processing...') => {
         if (overlay) {
             const messageElement = document.getElementById('loadingMessageText');
@@ -84,6 +84,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 overlay.classList.add('opacity-100');
             }, 10);
             document.body.style.overflow = 'hidden';
+        }
+    };
+
+    const hideLoadingOverlay = () => {
+        if (overlay) {
+            overlay.classList.add('opacity-0');
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+            }, 300);
+            if(modal.classList.contains('hidden') && successModal.classList.contains('hidden') && editModal.classList.contains('hidden') && deleteModal.classList.contains('hidden')) {
+                document.body.style.overflow = '';
+            }
         }
     };
 
@@ -123,19 +135,60 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- Edit Action Handler (called from section card) ---
-    window.initiateEditAction = function(sectionId, sectionData) {
-        if (!sectionData) {
-            console.error("Section data not found for ID: " + sectionId);
+    // The section data is passed as a string, must be parsed first.
+    window.initiateEditAction = function(sectionId, sectionDataString) {
+        showLoadingOverlay('Loading section data...');
+        
+        let sectionData;
+        try {
+            sectionData = JSON.parse(sectionDataString);
+        } catch (e) {
+            console.error("Failed to parse section data JSON:", e);
+            hideLoadingOverlay();
             return;
         }
 
-        editSectionIdInput.value = sectionId;
-        editNameInput.value = sectionData.name || '';
-        editYearInput.value = sectionData.year || '';
-        editTeacherInput.value = sectionData.teacher || '';
+        if (!sectionData || !sectionData.id) {
+            console.error("Section data not found for ID: " + sectionId);
+            hideLoadingOverlay();
+            return;
+        }
 
-        openModal(editModal, editModalContent);
+        // Apply a 200ms delay for consistent UX
+        setTimeout(() => {
+            editSectionIdInput.value = sectionData.id;
+            editNameInput.value = sectionData.name || '';
+            editTeacherInput.value = sectionData.teacher || '';
+
+            const yearRadio = document.getElementById('edit_year_' + (sectionData.year || '').replace(' ', '_'));
+            if (yearRadio) {
+                yearRadio.checked = true;
+            }
+
+            hideLoadingOverlay();
+            openModal(editModal, editModalContent);
+        }, 200); // 200ms delay
     };
+
+    if (editForm) {
+        editForm.addEventListener('submit', function() {
+            showLoadingOverlay('Updating section...');
+            
+            const updateIcon = document.getElementById('updateIcon');
+            const updateText = document.getElementById('updateText');
+            const updateLoadingSpinner = document.getElementById('updateLoadingSpinner');
+            const updateSectionBtn = document.getElementById('updateSectionBtn');
+
+            if(updateIcon && updateText && updateLoadingSpinner && updateSectionBtn) {
+                updateIcon.classList.add('hidden');
+                updateText.textContent = 'Updating...';
+                updateLoadingSpinner.classList.remove('hidden');
+                updateSectionBtn.disabled = true;
+                updateSectionBtn.classList.remove('hover:bg-green-700');
+                updateSectionBtn.classList.add('opacity-70', 'cursor-not-allowed');
+            }
+        });
+    }
 
     // --- Delete Confirmation (Generic Modal Opener) ---
     /**
@@ -190,9 +243,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let detailsToShow = null;
     let modalTitle = 'Success';
     let modalDescription = '';
-
-    // sectionsList is assumed to be defined globally in sections.php
-    // sectionToEdit is assumed to be defined globally in sections.php
 
     if (typeof successDetails !== 'undefined' && successDetails && successDetails.name) {
         detailsToShow = successDetails;
