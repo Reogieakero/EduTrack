@@ -151,7 +151,6 @@ include '../components/delete_confirmation_modal.php';
     <input type="hidden" name="teacher_id" id="delete_id_input" value="">
 </form>
 <?php
-// CRITICAL: These variables must be set by the controller to trigger the success modals
 $teachers_list_json = json_encode($teachers);
 $add_success_json = json_encode($add_success_details);
 $edit_success_json = json_encode($edit_success_details); 
@@ -162,7 +161,7 @@ $sections_list_json = json_encode($sections_list);
 
 echo "<script>const teachersList = {$teachers_list_json};</script>";
 echo "<script>const successDetails = {$add_success_json};</script>";
-echo "<script>const editSuccessDetails = {$edit_success_json};</script>"; // Trigger for Update Success
+echo "<script>const editSuccessDetails = {$edit_success_json};</script>"; 
 echo "<script>const deleteSuccessDetails = {$delete_success_json};</script>"; 
 echo "<script>const assignSuccessDetails = {$assign_success_json};</script>"; 
 echo "<script>const teacherToEdit = {$edit_data_json};</script>";

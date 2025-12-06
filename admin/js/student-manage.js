@@ -313,7 +313,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     else if (typeof bulkSuccessDetails !== 'undefined' && bulkSuccessDetails && (bulkSuccessDetails.added > 0 || bulkSuccessDetails.failed > 0)) {
         detailsToShow = bulkSuccessDetails;
-        // User request: "Bulk uploaded successfully"
         modalTitle = 'Bulk Enrollment Complete!'; 
         modalDescription = `Successfully added ${detailsToShow.added} students. ${detailsToShow.failed} students failed to enroll.`;
         
@@ -340,7 +339,6 @@ document.addEventListener('DOMContentLoaded', function() {
             successModalDescription.innerHTML = modalDescription; 
         }
         
-        // NEW LOGIC TO HIDE/SHOW DETAILS BLOCK
         if (modalDetailBlock) {
             if (typeof bulkSuccessDetails !== 'undefined' && bulkSuccessDetails && (bulkSuccessDetails.added > 0 || bulkSuccessDetails.failed > 0)) {
                 modalDetailBlock.classList.add('hidden');
@@ -469,16 +467,14 @@ function handleSectionSelect(listItem, modalType = 'add') {
     const optionsList = document.getElementById(optionsListId);
     
     optionsList.querySelectorAll('li').forEach(li => {
-        // Removed color classes: bg-primary-green, text-white
         li.classList.remove('bg-primary-green', 'bg-gray-200', 'text-white', 'font-semibold'); 
-        li.classList.add('hover:bg-gray-100', 'text-gray-900'); // Ensure hover and default text color
+        li.classList.add('hover:bg-gray-100', 'text-gray-900'); 
         const checkIcon = li.querySelector('.section-check-icon');
         if (checkIcon) checkIcon.classList.add('hidden');
     });
 
-    // Use neutral gray background for selection
     listItem.classList.add('bg-gray-200', 'font-semibold', 'text-gray-900'); 
-    listItem.classList.remove('hover:bg-gray-100', 'bg-primary-green', 'text-white'); // Removed primary-green/text-white 
+    listItem.classList.remove('hover:bg-gray-100', 'bg-primary-green', 'text-white');
     const checkIcon = listItem.querySelector('.section-check-icon');
     if (checkIcon) checkIcon.classList.remove('hidden');
     

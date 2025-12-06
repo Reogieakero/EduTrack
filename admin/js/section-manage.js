@@ -9,7 +9,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 300);
     }
 
-    // --- Add/Success Modals ---
     const modal = document.getElementById('addSectionModal');
     const modalContent = document.getElementById('modalContent');
     const openBtn = document.getElementById('openModalBtn');
@@ -27,7 +26,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const successModalDescription = document.getElementById('success-modal-description');
 
-    // --- Edit Modal ---
     const editModal = document.getElementById('editSectionModal');
     const editModalContent = document.getElementById('editModalContent');
     const closeEditModalBtn = document.getElementById('closeEditModalBtn');
@@ -35,11 +33,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const editSectionIdInput = document.getElementById('edit_section_id');
     const editNameInput = document.getElementById('edit_modal_section_name');
     const editYearInput = document.getElementById('edit_modal_section_year');
-    // START: MODIFIED Teacher Dropdown reference
     const editTeacherSelect = document.getElementById('edit_modal_teacher_name');
-    // END: MODIFIED Teacher Dropdown reference
     
-    // --- Delete Modal (Generic) ---
     const deleteModal = document.getElementById('deleteConfirmationModal');
     const deleteModalContent = document.getElementById('deleteModalContent');
     const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
@@ -47,8 +42,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const deleteItemNameSpan = document.getElementById('deleteItemName');
     const deleteItemTypeSpan = document.getElementById('deleteItemType');
 
-
-    // --- Modal Helpers ---
 
     const openModal = (targetModal, targetContent) => {
         targetModal.classList.remove('hidden');
@@ -67,14 +60,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         setTimeout(() => {
             targetModal.classList.add('hidden');
-            // Check if all modals are closed before re-enabling scroll
             if(modal.classList.contains('hidden') && successModal.classList.contains('hidden') && editModal.classList.contains('hidden') && deleteModal.classList.contains('hidden')) {
                 document.body.style.overflow = '';
             }
         }, 300); 
     };
     
-    // --- Loading Overlay Functions ---
     const showLoadingOverlay = (message = 'Processing...') => {
         if (overlay) {
             const messageElement = document.getElementById('loadingMessageText');
@@ -102,7 +93,6 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
 
-    // --- Event Listeners ---
     if (openBtn) openBtn.addEventListener('click', () => openModal(modal, modalContent));
     if (closeBtn) closeBtn.addEventListener('click', () => closeModal(modal, modalContent));
     if (closeSuccessModalBtn) closeSuccessModalBtn.addEventListener('click', () => closeModal(successModal, successModalContent));
@@ -110,7 +100,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (cancelDeleteBtn) cancelDeleteBtn.addEventListener('click', () => closeModal(deleteModal, deleteModalContent));
 
 
-    // Close modals when clicking outside
     [modal, successModal, editModal, deleteModal].forEach(m => {
         if (m) m.addEventListener('click', (e) => {
             if (e.target === m) {
@@ -122,7 +111,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // --- Add Form Submission ---
     if (addSectionForm) {
         addSectionForm.addEventListener('submit', function() {
             if(saveIcon && saveText && loadingSpinner && saveSectionBtn) {
@@ -136,8 +124,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Edit Action Handler (called from section card) ---
-    // The section data is passed as a string, must be parsed first.
     window.initiateEditAction = function(sectionId, sectionDataString) {
         showLoadingOverlay('Loading section data...');
         
@@ -156,7 +142,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Apply a 200ms delay for consistent UX
         setTimeout(() => {
             editSectionIdInput.value = sectionData.id;
             editNameInput.value = sectionData.name || '';
@@ -166,23 +151,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 yearRadio.checked = true;
             }
 
-            // START: Logic to populate and select teacher dropdown
             if (editTeacherSelect) {
-                editTeacherSelect.innerHTML = ''; // Clear existing options
+                editTeacherSelect.innerHTML = '';
                 const currentTeacherName = sectionData.teacher || 'Unassigned';
 
-                // 1. Add Unassigned option
                 const unassignedOption = document.createElement('option');
                 unassignedOption.value = 'Unassigned';
                 unassignedOption.textContent = 'Unassigned (No Teacher)';
                 editTeacherSelect.appendChild(unassignedOption);
                 
-                // 2. Add Teachers: current teacher (if assigned) and all unassigned teachers
                 if (typeof allTeachers !== 'undefined' && Array.isArray(allTeachers)) {
                     allTeachers.forEach(teacher => {
-                        // Check if the teacher is currently unassigned (assigned_section_id is 0)
-                        // OR if the teacher is the one currently assigned to THIS section (by name)
-                        // NOTE: teacher.assigned_section_id is the ID of the section they are assigned to, 0 if unassigned.
                         const isUnassigned = parseInt(teacher.assigned_section_id) === 0;
                         const isCurrentTeacher = teacher.full_name === currentTeacherName;
 
@@ -197,14 +176,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error("Teacher data (allTeachers) not found in scope.");
                 }
 
-                // 3. Select the current teacher/Unassigned option
                 editTeacherSelect.value = currentTeacherName;
             }
-            // END: Logic to populate and select teacher dropdown
 
             hideLoadingOverlay();
             openModal(editModal, editModalContent);
-        }, 200); // 200ms delay
+        }, 200); 
     };
 
     if (editForm) {
@@ -227,16 +204,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Delete Confirmation (Generic Modal Opener) ---
-    /**
-     * Shows the generic delete confirmation modal with specific details.
-     * @param {number|string} itemId The ID of the item (section) to delete.
-     * @param {string} itemName The display name of the item.
-     * @param {('section')} itemType The type of item being deleted (always 'section' here).
-     */
     window.confirmDeleteAction = function(itemId, itemName, itemType) {
         deleteItemNameSpan.textContent = itemName;
-        deleteItemTypeSpan.textContent = itemType; // Should be 'section'
+        deleteItemTypeSpan.textContent = itemType; 
         
         confirmDeleteBtn.setAttribute('data-item-id', itemId);
         confirmDeleteBtn.setAttribute('data-item-type', itemType);
@@ -244,20 +214,16 @@ document.addEventListener('DOMContentLoaded', function() {
         openModal(deleteModal, deleteModalContent);
     };
 
-    // --- Generic Delete Confirmation POST Handler ---
     if (confirmDeleteBtn) {
         confirmDeleteBtn.addEventListener('click', function() {
             const itemId = this.getAttribute('data-item-id');
             const itemType = this.getAttribute('data-item-type');
             
             if (itemType === 'section') {
-                // 1. Close the confirmation modal
                 closeModal(deleteModal, deleteModalContent); 
                 
-                // 2. Show the loading overlay
                 showLoadingOverlay('Deleting section and associated data...'); 
                 
-                // 3. Submit the form for section deletion
                 const tempForm = document.createElement('form');
                 tempForm.method = 'POST';
                 tempForm.action = 'sections.php';
@@ -270,13 +236,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 tempForm.submit();
             } else {
                 console.error("Item type mismatch in section-manage.js delete handler.");
-                // If student-manage.js is also present, it should handle 'student'
             }
         });
     }
 
 
-    // --- Success Details Display Logic (MODIFIED) ---
     let detailsToShow = null;
     let modalTitle = 'Success';
     let modalDescription = '';
@@ -305,7 +269,6 @@ document.addEventListener('DOMContentLoaded', function() {
             successModalDescription.textContent = modalDescription; 
         }
 
-        // Assuming success_modal.php has these IDs
         if (document.getElementById('modalSectionName')) {
              document.getElementById('modalSectionName').textContent = detailsToShow.name || 'N/A';
         }
@@ -313,12 +276,10 @@ document.addEventListener('DOMContentLoaded', function() {
              document.getElementById('modalSectionYear').textContent = detailsToShow.year || 'N/A';
         }
         
-        // START: NEW LOGIC FOR TEACHER ASSIGNMENT
         if (document.getElementById('modalSectionTeacher')) {
              const assignedTeacher = detailsToShow.teacher || 'Unassigned';
              document.getElementById('modalSectionTeacher').textContent = assignedTeacher;
         }
-        // END: NEW LOGIC FOR TEACHER ASSIGNMENT
         
         if (addSectionForm) {
             addSectionForm.reset(); 

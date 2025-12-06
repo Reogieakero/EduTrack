@@ -137,7 +137,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const showSuccessModal = (title, message) => {
         if (!successModal) return;
         
-        // CRITICAL: Ensure modal content is visible when triggered on page load
         const titleElement = document.getElementById('success-modal-title');
         const messageElement = document.getElementById('success-modal-description');
         const contentElement = document.getElementById('successModalContent'); 
@@ -163,7 +162,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('closeSuccessModalBtn')?.addEventListener('click', () => hideSimpleModal(successModal));
     document.getElementById('okSuccessModalBtn')?.addEventListener('click', () => hideSimpleModal(successModal)); 
 
-    // --- Success Triggers ---
     if (typeof successDetails !== 'undefined' && successDetails) {
         showSuccessModal('Teacher Registered Successfully!', 
             `<p><strong>${successDetails.name}</strong> has been successfully registered.</p>
@@ -191,7 +189,6 @@ document.addEventListener('DOMContentLoaded', function() {
         history.replaceState(null, null, 'teachers.php'); 
     }
     
-    // --- Add Teacher Logic ---
     openAddModalBtn?.addEventListener('click', () => {
         addTeacherForm?.reset();
         showModal(addModal, addModalContent);
@@ -205,17 +202,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
 
-    // --- Edit Teacher Logic ---
     const initiateEditAction = (teacherId) => {
         
-        // 1. Show loading overlay immediately as requested
         showSimpleModal(loadingOverlay); 
 
-        // Check if teacher data is locally available
         const teacherData = (typeof teachersList !== 'undefined') ? teachersList.find(t => t.id == teacherId) : null;
         
         if (teacherData && editTeacherForm) {
-            // SCENARIO 1: Data is local. Open modal instantly.
             document.getElementById('edit_teacher_id').value = teacherData.id;
             document.getElementById('edit_last_name').value = teacherData.last_name;
             document.getElementById('edit_first_name').value = teacherData.first_name;
@@ -225,31 +218,25 @@ document.addEventListener('DOMContentLoaded', function() {
             
             showModal(editModal, editModalContent);
             
-            // 2. Hide loading overlay after the edit modal is displayed
-            // A short delay (100ms) can ensure the modal transition starts before hiding the overlay, reducing flash.
             setTimeout(() => {
                 hideSimpleModal(loadingOverlay);
             }, 100);
 
         } else if (editTeacherForm) {
-             // SCENARIO 2: Data is NOT local. Send request to fetch (page reload).
              document.getElementById('edit_teacher_id').value = teacherId;
              editTeacherForm.action = 'teachers.php';
              editTeacherForm.querySelector('input[name="action"]').value = 'edit_teacher'; 
              editTeacherForm.submit(); 
              
-             // Loading overlay remains visible until the page reloads.
         }
     };
     window.initiateEditAction = initiateEditAction;
 
     closeEditModalBtn?.addEventListener('click', () => hideModal(editModal, editModalContent));
     
-    // --- Edit Form Submission ---
     editTeacherForm?.addEventListener('submit', () => {
         editTeacherForm.querySelector('input[name="action"]').value = 'update_teacher';
         hideModal(editModal, editModalContent);
-        // Show overlay before form submission and page redirect
         showSimpleModal(loadingOverlay);
     });
 
@@ -263,7 +250,6 @@ document.addEventListener('DOMContentLoaded', function() {
          history.replaceState(null, null, 'teachers.php'); 
     }
     
-    // --- Delete Confirmation Logic ---
     const confirmDeleteAction = (teacherId, teacherName) => {
         if (!deleteModal || !deleteModalContent) return;
         

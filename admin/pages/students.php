@@ -6,29 +6,15 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     exit;
 }
 
-// ----------------------------------------------------
-// 1. ADD COMPOSER AUTOLOAD AND PHPSPREADSHEET IMPORTS
-// Assumes 'students.php' is in a subdirectory like 'pages'
 require __DIR__ . '/../../vendor/autoload.php';
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
-use PhpOffice\PhpSpreadsheet\Shared\Date; // For converting Excel dates
-// ----------------------------------------------------
+use PhpOffice\PhpSpreadsheet\Shared\Date; 
 
 require_once '../../config/database.php';
 
-/**
- * Checks if a student with the same name already exists in the database.
- * * @param mysqli $conn The database connection object.
- * @param string $first_name
- * @param string $last_name
- * @param string|null $middle_initial
- * @return bool True if a duplicate is found, false otherwise.
- */
 function check_for_duplicate_student($conn, $first_name, $last_name, $middle_initial) {
-    // Basic check: Case-insensitive match on first and last name.
-    // Middle initial must also match if both are non-null.
-    
+
     $sql = "SELECT id FROM students WHERE 
             LOWER(first_name) = LOWER(?) AND 
             LOWER(last_name) = LOWER(?)";
@@ -36,18 +22,15 @@ function check_for_duplicate_student($conn, $first_name, $last_name, $middle_ini
     $params = [$first_name, $last_name];
     $types = 'ss';
 
-    // Handle middle initial check
     if (!empty($middle_initial)) {
         $sql .= " AND LOWER(middle_initial) = LOWER(?)";
         $params[] = $middle_initial;
         $types .= 's';
     } else {
-        // If the input MI is null, only check for existing records where MI is null
         $sql .= " AND middle_initial IS NULL";
     }
 
     if ($stmt = $conn->prepare($sql)) {
-        // Dynamically bind parameters
         $bind_names = [$types];
         for ($i=0; $i<count($params); $i++) {
             $bind_names[] = &$params[$i];
@@ -62,7 +45,7 @@ function check_for_duplicate_student($conn, $first_name, $last_name, $middle_ini
         }
         $stmt->close();
     }
-    return false; // Return false if a database error occurs (safest default)
+    return false; 
 }
 
 function generate_student_id($conn) {
@@ -121,7 +104,7 @@ if (isset($_SESSION['bulk_success_details'])) {
     $bulk_success_details = $_SESSION['bulk_success_details'];
     unset($_SESSION['bulk_success_details']);
 }
-$add_error_details = null; // Changed from $add_error to $add_error_details
+$add_error_details = null;
 if (isset($_SESSION['add_error_details'])) {
     $add_error_details = $_SESSION['add_error_details'];
     unset($_SESSION['add_error_details']);
@@ -166,14 +149,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if (empty($first_name) || empty($last_name) || $section_id <= 0 || empty($date_of_birth)) {
             $_SESSION['add_error_details'] = "All required student fields are necessary.";
         } 
-        // ----------------------------------------
-        // DUPLICATE CHECK FOR SINGLE ADD
-        // ----------------------------------------
         else if (check_for_duplicate_student($conn, $first_name, $last_name, $middle_initial)) {
             $full_name = $last_name . ', ' . $first_name . ($middle_initial ? ' ' . $middle_initial . '.' : '');
             $_SESSION['add_error_details'] = "ERROR: A student with the name **{$full_name}** already exists in the system.";
         }
-        // ----------------------------------------
         else {
             $new_id = generate_student_id($conn);
             
@@ -217,9 +196,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
     
-    // ------------------------------------------------------------------------------------------------
-    // UPDATED: BULK ADD STUDENTS LOGIC USING PHPSPREADSHEET
-    // ------------------------------------------------------------------------------------------------
     if ($_POST['action'] === 'bulk_add_students') {
         if (isset($_FILES['student_file']) && $_FILES['student_file']['error'] === UPLOAD_ERR_OK) {
             $file_tmp_path = $_FILES['student_file']['tmp_name'];
@@ -260,7 +236,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             
                             $middle_initial = empty($middle_initial_raw) ? null : strtoupper(substr($middle_initial_raw, 0, 1));
                             
-                            // 1. Resolve Section ID
                             $section_id = 0;
                             foreach ($sections_list as $id => $section) {
                                 $full_section_name = $section['year'] . ' - ' . $section['name'];
@@ -270,7 +245,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                 }
                             }
                             
-                            // 2. Format Date of Birth
                             $date_of_birth = null;
                             if (!empty($date_of_birth_raw)) {
                                 if (is_numeric($date_of_birth_raw) && $date_of_birth_raw > 1) {
@@ -284,21 +258,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                 }
                             }
 
-                            // 3. Basic Validation
                             if (empty($first_name) || empty($last_name) || $section_id <= 0 || empty($date_of_birth)) {
                                 $students_failed++;
                                 $errors[] = "Row {$row_count} (Name: {$last_name}, {$first_name}): Missing or invalid data (First Name, Last Name, Section, or DOB).";
                                 continue;
                             }
                             
-                            // 4. DUPLICATE CHECK FOR BULK ADD
                             if (check_for_duplicate_student($conn, $first_name, $last_name, $middle_initial)) {
                                 $students_failed++;
                                 $errors[] = "Row {$row_count} (Name: {$last_name}, {$first_name}): Duplicate student found. Skipping insertion.";
                                 continue;
                             }
                             
-                            // 5. Generate ID and Insert
                             $new_id = generate_student_id($conn);
 
                             if (is_null($new_id)) {
@@ -353,12 +324,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         header("Location: students.php");
         exit;
     }
-    // ------------------------------------------------------------------------------------------------
-    // END OF UPDATED BULK ADD STUDENTS LOGIC
-    // ------------------------------------------------------------------------------------------------
     
     if ($_POST['action'] === 'delete_student') {
-        // ... (Delete logic remains unchanged)
         $student_id = trim($_POST['student_id'] ?? '');
 
         if (!empty($student_id)) {
@@ -406,7 +373,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
     
     if ($_POST['action'] === 'fetch_edit_data') {
-        // ... (Fetch edit data logic remains unchanged)
         $student_id = trim($_POST['student_id'] ?? ''); 
         
         if (!empty($student_id)) { 
@@ -438,7 +404,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if ($_POST['action'] === 'edit_student') {
-        // ... (Edit logic remains unchanged)
         $student_id = trim($_POST['student_id'] ?? ''); 
         $first_name = trim($_POST['first_name'] ?? '');
         $last_name = trim($_POST['last_name'] ?? '');
@@ -454,7 +419,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $sql = "UPDATE students SET first_name = ?, last_name = ?, middle_initial = ?, section_id = ?, date_of_birth = ? WHERE id = ?";
             
             if ($stmt = $conn->prepare($sql)) {
-                // CORRECTED LINE: Changed "sssisss" (7 types) to "sssiss" (6 types) to match the 6 placeholders.
                 $stmt->bind_param("sssiss", $param_first_name, $param_last_name, $param_middle_initial, $param_section_id, $param_dob, $param_id);
                 
                 $param_first_name = $first_name;
