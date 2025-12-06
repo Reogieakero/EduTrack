@@ -1,20 +1,14 @@
 <?php
-// controllers/teacher_controller.php
 session_start();
 
-// Check if user is logged in (Authentication)
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     header("Location: ../pages/login.html");
     exit;
 }
 
-// =================================================================
-// PATH CORRECTION APPLIED: Reverted to '../../config/database.php'
-// Assumes config folder is one level up from 'admin'.
-// =================================================================
+
 require_once '../../config/database.php'; 
 
-// --- Session Messages / State Management ---
 $add_success_details = $_SESSION['add_teacher_success'] ?? null;
 unset($_SESSION['add_teacher_success']);
 
@@ -33,16 +27,13 @@ unset($_SESSION['assign_teacher_success']);
 $add_error = null;
 $fetch_error = null;
 
-// Clear potential section/auth errors/states 
 unset($_SESSION['auth_error']);
 unset($_SESSION['auth_action']);
 unset($_SESSION['auth_section_id']);
 
-// --- Fetch All Teachers and Sections ---
 $teachers = [];
 $sections_list = [];
 
-// 1. Fetch Teachers and their assigned section names
 $sql_fetch_teachers = "
     SELECT t.id, t.last_name, t.first_name, t.email, s.name AS section_name, s.year AS section_year, s.id AS section_id
     FROM teachers t
@@ -67,7 +58,6 @@ if ($stmt = $conn->prepare($sql_fetch_teachers)) {
 }
 
 
-// 2. Fetch all Sections for assignment dropdowns
 $sql_fetch_sections = "SELECT id, name, year, teacher FROM sections ORDER BY year ASC, name ASC";
 
 if ($stmt = $conn->prepare($sql_fetch_sections)) {
@@ -83,7 +73,6 @@ if ($stmt = $conn->prepare($sql_fetch_sections)) {
 }
 
 
-// --- Handle POST Requests (CRUD Operations) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     
     $redirect_url = basename($_SERVER['PHP_SELF']);
@@ -91,7 +80,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action_to_perform = $_POST['action'];
     $teacher_id = (int)($_POST['teacher_id'] ?? 0);
 
-    // --- ADD TEACHER ---
     if ($action_to_perform === 'add_teacher') {
         $lastName = trim($_POST['last_name'] ?? '');
         $firstName = trim($_POST['first_name'] ?? '');
@@ -126,7 +114,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // --- EDIT TEACHER (Prepare data for modal via session/redirect) ---
     if ($action_to_perform === 'edit_teacher' && $teacher_id > 0) {
         $sql = "SELECT id, last_name, first_name, email, assigned_section_id FROM teachers WHERE id = ?";
         if ($stmt = $conn->prepare($sql)) {
@@ -142,7 +129,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
 
-    // --- UPDATE TEACHER ---
     if ($action_to_perform === 'update_teacher' && $teacher_id > 0) {
         $updatedLastName = trim($_POST['edit_last_name'] ?? '');
         $updatedFirstName = trim($_POST['edit_first_name'] ?? '');
@@ -222,14 +208,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
     
-    // --- ASSIGN TEACHER TO SECTION ---
     if ($action_to_perform === 'assign_teacher' && $teacher_id > 0) {
         $section_id_to_assign = (int)($_POST['section_id'] ?? 0);
         
         $teacher_name = '';
         $section_name_year = '';
         
-        // 1. Get Teacher Name
         $sql_teacher_name = "SELECT first_name, last_name, assigned_section_id FROM teachers WHERE id = ?";
         if ($stmt = $conn->prepare($sql_teacher_name)) {
             $stmt->bind_param("i", $teacher_id);
@@ -242,7 +226,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $stmt->close();
         }
 
-        // 2. Get Section Details
         $sql_section_details = "SELECT name, year FROM sections WHERE id = ?";
         if ($stmt = $conn->prepare($sql_section_details)) {
             $stmt->bind_param("i", $section_id_to_assign);
@@ -258,7 +241,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $add_error = "ERROR: Teacher or section details not found.";
         } else {
             
-             // 3. Unassign the teacher from their previous section
              if ($old_section_id && $old_section_id != $section_id_to_assign) {
                  $sql_unassign_old_section = "UPDATE sections SET teacher = NULL WHERE id = ?";
                  if ($stmt_unassign = $conn->prepare($sql_unassign_old_section)) {
@@ -268,12 +250,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                  }
              }
 
-            // 4. Update the NEW section's 'teacher' field with the teacher's name
             $sql_update_section = "UPDATE sections SET teacher = ? WHERE id = ?";
             if ($stmt = $conn->prepare($sql_update_section)) {
                 $stmt->bind_param("si", $teacher_name, $section_id_to_assign);
                 if ($stmt->execute()) {
-                    // 5. Update the teacher's 'assigned_section_id' field
                     $sql_update_teacher = "UPDATE teachers SET assigned_section_id = ? WHERE id = ?";
                     if ($stmt2 = $conn->prepare($sql_update_teacher)) {
                         $stmt2->bind_param("ii", $section_id_to_assign, $teacher_id);

@@ -1,9 +1,6 @@
 <?php
-// views/teachers.php (now correctly in Admin/pages)
-// This file assumes the controller fetches all necessary data ($teachers, $sections_list, $success_details, etc.)
 include '../controllers/teacher_controller.php'; 
 
-// Ensure variables are initialized (or remove this block if your controller guarantees definition)
 $teachers = $teachers ?? [];
 $sections_list = $sections_list ?? [];
 $add_success_details = $add_success_details ?? null; 
@@ -45,8 +42,6 @@ tailwind.config = {
 <body class="bg-page-bg min-h-screen flex">
 
 <?php 
-// NOTE: Paths are correct relative to the 'pages/' directory
-// Includes for required components (Sidebar, Loading Overlay)
 include '../components/loading_overlay.php'; 
 include '../components/sidebar.php'; 
 ?>
@@ -105,7 +100,6 @@ include '../components/sidebar.php';
                             $assigned_section = $teacher['section_name'] 
                                 ? htmlspecialchars($teacher['section_year'] . ' - ' . $teacher['section_name'])
                                 : '<span class="text-red-500 font-medium">None Assigned</span>';
-                            // Encode full name for passing to JS functions
                             $full_name_encoded = htmlspecialchars($teacher['first_name'] . ' ' . $teacher['last_name'], ENT_QUOTES);
                         ?>
                         <tr>
@@ -145,7 +139,6 @@ include '../components/sidebar.php';
 </main>
 
 <?php 
-// Include necessary Modals (All modal files must exist in the components directory)
 include '../components/edit_teacher_modal.php'; 
 include '../components/teacher_assignment_modal.php'; 
 include '../components/add_teacher_modal.php'; 
@@ -158,16 +151,14 @@ include '../components/delete_confirmation_modal.php';
     <input type="hidden" name="teacher_id" id="delete_id_input" value="">
 </form>
 <?php
-// JSON variables for JS
 $teachers_list_json = json_encode($teachers);
 $add_success_json = json_encode($add_success_details);
 $edit_success_json = json_encode($edit_success_details); 
 $delete_success_json = json_encode($delete_success_details); 
 $assign_success_json = json_encode($assign_success_details); 
 $edit_data_json = json_encode($teacher_to_edit);
-$sections_list_json = json_encode($sections_list); // REQUIRED for the assignment dropdown
+$sections_list_json = json_encode($sections_list); 
 
-// Pass PHP data to JavaScript
 echo "<script>const teachersList = {$teachers_list_json};</script>";
 echo "<script>const successDetails = {$add_success_json};</script>";
 echo "<script>const editSuccessDetails = {$edit_success_json};</script>"; 
@@ -180,7 +171,6 @@ echo "<script>const sectionsList = {$sections_list_json};</script>";
 <script src= "../js/teacher-manage.js"></script> 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Ensure Lucide icons are created AFTER the DOM is loaded
         lucide.createIcons();
     });
 </script>

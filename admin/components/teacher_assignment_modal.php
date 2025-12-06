@@ -62,10 +62,8 @@
                                     </li>
 
                                     <?php 
-                                    // Assumes $sections_list is available from the teacher_controller.php
                                     if (isset($sections_list) && is_array($sections_list)):
                                         foreach ($sections_list as $section): 
-                                            // Determine current teacher's status for the section
                                             $teacher_status = $section['teacher'] ? ' (Teacher: ' . htmlspecialchars($section['teacher']) . ')' : ' (Unassigned)';
                                             $option_display_name = htmlspecialchars($section['year'] . ' - ' . $section['name']);
                                     ?>
