@@ -4,6 +4,7 @@ if (!isset($section)) {
     return;
 }
 
+// Ensure $section['students'] is an array for count operation
 $student_count = $section['student_count'] ?? count($section['students'] ?? []);
 $teacher_display = htmlspecialchars($section['teacher'] ?? 'Unassigned');
 $year_display = htmlspecialchars($section['year'] ?? 'N/A');
@@ -35,7 +36,7 @@ if ($created_at_timestamp) {
                 </button>
                 
                 <button 
-                    onclick="confirmDeleteAction('<?php echo htmlspecialchars($section['id']); ?>', '<?php echo htmlspecialchars($section['name']); ?>')"
+                    onclick="confirmDeleteAction('<?php echo htmlspecialchars($section['id']); ?>', '<?php echo htmlspecialchars($section['name']); ?>', 'section')"
                     class="text-gray-400 hover:text-red-500 p-1 rounded-full transition duration-150" 
                     title="Delete Section">
                     <i data-lucide="trash-2" class="w-4 h-4"></i>

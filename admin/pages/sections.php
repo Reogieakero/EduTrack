@@ -48,47 +48,50 @@ if (!in_array($selected_year, $valid_years)) {
 }
 
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_section') {
-    $new_section_name = trim($_POST['section_name'] ?? '');
-    $new_teacher_name = trim($_POST['teacher_name'] ?? '');
-    $new_section_year = trim($_POST['section_year'] ?? '');
-    
-    if (empty($new_section_name) || empty($new_teacher_name) || empty($new_section_year)) {
-        $add_error = "Section Name, Assigned Teacher, and Academic Year are all required.";
-    } else {
-        $sql = "INSERT INTO sections (year, name, teacher) VALUES (?, ?, ?)";
-        
-        if ($stmt = $conn->prepare($sql)) {
-            $stmt->bind_param("sss", $param_year, $param_name, $param_teacher);
-            
-            $param_year = $new_section_year;
-            $param_name = $new_section_name;
-            $param_teacher = $new_teacher_name;
-            
-            if ($stmt->execute()) {
-                $_SESSION['add_success_details'] = [
-                    'name' => $new_section_name,
-                    'year' => $new_section_year,
-                    'teacher' => $new_teacher_name
-                ];
-                header("Location: sections.php");
-                exit;
-            } else {
-                $add_error = "ERROR: Could not execute the insert statement. " . $stmt->error;
-            }
-
-            $stmt->close();
-        } else {
-            $add_error = "ERROR: Could not prepare the insert statement. " . $conn->error;
-        }
-    }
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']) && ($_POST['action'] === 'delete_section' || $_POST['action'] === 'edit_section' || $_POST['action'] === 'update_section'))) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']))) {
     
     $action_to_perform = $_POST['action'];
     $section_id = (int)($_POST['section_id'] ?? 0);
-    
+
+    // --- Handle Add Section ---
+    if ($action_to_perform === 'add_section') {
+        $new_section_name = trim($_POST['section_name'] ?? '');
+        $new_teacher_name = trim($_POST['teacher_name'] ?? '');
+        $new_section_year = trim($_POST['section_year'] ?? '');
+        
+        if (empty($new_section_name) || empty($new_teacher_name) || empty($new_section_year)) {
+            $add_error = "Section Name, Assigned Teacher, and Academic Year are all required.";
+        } else {
+            $sql = "INSERT INTO sections (year, name, teacher) VALUES (?, ?, ?)";
+            
+            if ($stmt = $conn->prepare($sql)) {
+                $stmt->bind_param("sss", $param_year, $param_name, $param_teacher);
+                
+                $param_year = $new_section_year;
+                $param_name = $new_section_name;
+                $param_teacher = $new_teacher_name;
+                
+                if ($stmt->execute()) {
+                    $_SESSION['add_success_details'] = [
+                        'name' => $new_section_name,
+                        'year' => $new_section_year,
+                        'teacher' => $new_teacher_name
+                    ];
+                    header("Location: sections.php");
+                    exit;
+                } else {
+                    $add_error = "ERROR: Could not execute the insert statement. " . $stmt->error;
+                }
+
+                $stmt->close();
+            } else {
+                $add_error = "ERROR: Could not prepare the insert statement. " . $conn->error;
+            }
+        }
+    }
+
+
+    // --- Handle Delete Section (The logic that needed to be executed) ---
     if ($action_to_perform === 'delete_section' && $section_id > 0) {
         $sql_select = "SELECT year, name, teacher FROM sections WHERE id = ?";
         $deleted_details = null;
@@ -102,27 +105,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['action']) && ($_POST
         }
 
         if ($deleted_details) {
-            $sql_delete = "DELETE FROM sections WHERE id = ?";
-            if ($stmt_delete = $conn->prepare($sql_delete)) {
-                $stmt_delete->bind_param("i", $section_id);
-                if ($stmt_delete->execute()) {
-                    $_SESSION['delete_success_details'] = [
-                        'name' => $deleted_details['name'],
-                        'year' => $deleted_details['year'],
-                        'teacher' => $deleted_details['teacher']
-                    ];
-                    header("Location: sections.php");
-                    exit;
+            // FIX: Step 1: Delete all associated students first to satisfy the FK constraint
+            $sql_delete_students = "DELETE FROM students WHERE section_id = ?";
+            if ($stmt_delete_students = $conn->prepare($sql_delete_students)) {
+                $stmt_delete_students->bind_param("i", $section_id);
+                
+                if ($stmt_delete_students->execute()) {
+                    $stmt_delete_students->close(); // Close student statement
+
+                    // Step 2: Delete the section (Original logic continues here)
+                    $sql_delete = "DELETE FROM sections WHERE id = ?";
+                    if ($stmt_delete = $conn->prepare($sql_delete)) {
+                        $stmt_delete->bind_param("i", $section_id);
+                        
+                        // Line 111 where the error occurred before the fix
+                        if ($stmt_delete->execute()) {
+                            $_SESSION['delete_success_details'] = [
+                                'name' => $deleted_details['name'],
+                                'year' => $deleted_details['year'],
+                                'teacher' => $deleted_details['teacher']
+                            ];
+                            header("Location: sections.php");
+                            exit;
+                        } else {
+                            $add_error = "ERROR: Could not delete section. " . $stmt_delete->error;
+                        }
+                        $stmt_delete->close();
+                    } else {
+                        $add_error = "ERROR: Could not prepare section delete statement. " . $conn->error;
+                    }
                 } else {
-                    $add_error = "ERROR: Could not delete section. " . $stmt_delete->error;
+                    $add_error = "ERROR: Could not delete associated students. " . $stmt_delete_students->error;
+                    $stmt_delete_students->close();
                 }
-                $stmt_delete->close();
+            } else {
+                $add_error = "ERROR: Could not prepare student deletion statement. " . $conn->error;
             }
+
         } else {
              $add_error = "ERROR: Section not found for deletion.";
         }
     }
     
+    // --- Handle Edit/Update Section ---
     if ($action_to_perform === 'edit_section' && $section_id > 0) {
         $sql = "SELECT id, year, name, teacher FROM sections WHERE id = ?";
         if ($stmt = $conn->prepare($sql)) {

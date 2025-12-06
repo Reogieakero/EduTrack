@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 300);
     }
 
+    // --- Add/Success Modals ---
     const modal = document.getElementById('addSectionModal');
     const modalContent = document.getElementById('modalContent');
     const openBtn = document.getElementById('openModalBtn');
@@ -24,25 +25,28 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveText = document.getElementById('saveText');
     const loadingSpinner = document.getElementById('loadingSpinner');
 
+    const successModalDescription = document.getElementById('success-modal-description');
+
+    // --- Edit Modal ---
     const editModal = document.getElementById('editSectionModal');
     const editModalContent = document.getElementById('editModalContent');
     const closeEditModalBtn = document.getElementById('closeEditModalBtn');
     const editForm = document.getElementById('editSectionForm');
     const editSectionIdInput = document.getElementById('edit_section_id');
-    const editSectionNameInput = document.getElementById('edit_modal_section_name');
-    const editTeacherNameInput = document.getElementById('edit_modal_teacher_name');
-    const editYearRadios = document.getElementsByName('edit_section_year');
-
+    const editNameInput = document.getElementById('edit_modal_section_name');
+    const editYearInput = document.getElementById('edit_modal_section_year');
+    const editTeacherInput = document.getElementById('edit_modal_teacher_name');
+    
+    // --- Delete Modal (Generic) ---
     const deleteModal = document.getElementById('deleteConfirmationModal');
     const deleteModalContent = document.getElementById('deleteModalContent');
     const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
     const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-    const deleteSectionNameSpan = document.getElementById('deleteSectionName');
-    
-    const loadingMessageText = document.getElementById('loadingMessageText');
+    const deleteItemNameSpan = document.getElementById('deleteItemName'); // Renamed to generic
+    const deleteItemTypeSpan = document.getElementById('deleteItemType'); // Renamed to generic
 
-    const successModalDescription = document.getElementById('success-modal-description');
 
+    // --- Modal Helpers ---
 
     const openModal = (targetModal, targetContent) => {
         targetModal.classList.remove('hidden');
@@ -61,150 +65,146 @@ document.addEventListener('DOMContentLoaded', function() {
         
         setTimeout(() => {
             targetModal.classList.add('hidden');
+            // Check if all modals are closed before re-enabling scroll
             if(modal.classList.contains('hidden') && successModal.classList.contains('hidden') && editModal.classList.contains('hidden') && deleteModal.classList.contains('hidden')) {
                 document.body.style.overflow = '';
             }
         }, 300); 
     };
 
-    window.initiateEditAction = function(sectionId) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = 'sections.php';
-
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'edit_section'; 
-        form.appendChild(actionInput);
-
-        const idInput = document.createElement('input');
-        idInput.type = 'hidden';
-        idInput.name = 'section_id';
-        idInput.value = sectionId;
-        form.appendChild(idInput);
-
-        document.body.appendChild(form);
-        form.submit();
+    // --- New Loading Function to show overlay ---
+    const showLoadingOverlay = (message = 'Processing...') => {
+        if (overlay) {
+            const messageElement = document.getElementById('loadingMessageText');
+            if (messageElement) {
+                messageElement.textContent = message;
+            }
+            overlay.classList.remove('hidden', 'opacity-0');
+            setTimeout(() => {
+                overlay.classList.add('opacity-100');
+            }, 10);
+            document.body.style.overflow = 'hidden';
+        }
     };
 
-    window.confirmDeleteAction = function(sectionId, sectionName) {
-        deleteSectionNameSpan.textContent = sectionName;
-        confirmDeleteBtn.setAttribute('data-section-id', sectionId);
+
+    // --- Event Listeners ---
+    if (openBtn) openBtn.addEventListener('click', () => openModal(modal, modalContent));
+    if (closeBtn) closeBtn.addEventListener('click', () => closeModal(modal, modalContent));
+    if (closeSuccessModalBtn) closeSuccessModalBtn.addEventListener('click', () => closeModal(successModal, successModalContent));
+    if (closeEditModalBtn) closeEditModalBtn.addEventListener('click', () => closeModal(editModal, editModalContent));
+    if (cancelDeleteBtn) cancelDeleteBtn.addEventListener('click', () => closeModal(deleteModal, deleteModalContent));
+
+
+    // Close modals when clicking outside
+    [modal, successModal, editModal, deleteModal].forEach(m => {
+        if (m) m.addEventListener('click', (e) => {
+            if (e.target === m) {
+                if(m.id === 'addSectionModal') closeModal(modal, modalContent);
+                else if(m.id === 'successModal') closeModal(successModal, successModalContent);
+                else if(m.id === 'editSectionModal') closeModal(editModal, editModalContent);
+                else if(m.id === 'deleteConfirmationModal') closeModal(deleteModal, deleteModalContent);
+            }
+        });
+    });
+
+    // --- Add Form Submission ---
+    if (addSectionForm) {
+        addSectionForm.addEventListener('submit', function() {
+            if(saveIcon && saveText && loadingSpinner && saveSectionBtn) {
+                saveIcon.classList.add('hidden');
+                saveText.textContent = 'Saving...';
+                loadingSpinner.classList.remove('hidden');
+                saveSectionBtn.disabled = true;
+                saveSectionBtn.classList.remove('hover:bg-blue-700');
+                saveSectionBtn.classList.add('opacity-70', 'cursor-not-allowed');
+            }
+        });
+    }
+
+    // --- Edit Action Handler (called from section card) ---
+    window.initiateEditAction = function(sectionId, sectionData) {
+        if (!sectionData) {
+            console.error("Section data not found for ID: " + sectionId);
+            return;
+        }
+
+        editSectionIdInput.value = sectionId;
+        editNameInput.value = sectionData.name || '';
+        editYearInput.value = sectionData.year || '';
+        editTeacherInput.value = sectionData.teacher || '';
+
+        openModal(editModal, editModalContent);
+    };
+
+    // --- Delete Confirmation (Generic Modal Opener) ---
+    /**
+     * Shows the generic delete confirmation modal with specific details.
+     * @param {number|string} itemId The ID of the item (section) to delete.
+     * @param {string} itemName The display name of the item.
+     * @param {('section')} itemType The type of item being deleted (always 'section' here).
+     */
+    window.confirmDeleteAction = function(itemId, itemName, itemType) {
+        deleteItemNameSpan.textContent = itemName;
+        deleteItemTypeSpan.textContent = itemType; // Should be 'section'
+        
+        confirmDeleteBtn.setAttribute('data-item-id', itemId);
+        confirmDeleteBtn.setAttribute('data-item-type', itemType);
+
         openModal(deleteModal, deleteModalContent);
     };
 
-    window.executeDeleteAction = function(sectionId) {
-        closeModal(deleteModal, deleteModalContent);
-
-        if (overlay) {
-            if (loadingMessageText) {
-                loadingMessageText.textContent = 'Deleting Section...'; 
-            }
+    // --- Generic Delete Confirmation POST Handler ---
+    if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener('click', function() {
+            const itemId = this.getAttribute('data-item-id');
+            const itemType = this.getAttribute('data-item-type');
             
-            overlay.classList.remove('hidden', 'opacity-0');
-            setTimeout(() => {
-                 overlay.classList.add('opacity-100');
-            }, 10);
-        }
-
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = 'sections.php';
-
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'delete_section';
-        form.appendChild(actionInput);
-
-        const idInput = document.createElement('input');
-        idInput.type = 'hidden';
-        idInput.name = 'section_id';
-        idInput.value = sectionId;
-        form.appendChild(idInput);
-
-        document.body.appendChild(form);
-        form.submit();
-    };
-    
-    if (sectionToEdit) {
-        editSectionIdInput.value = sectionToEdit.id;
-        editSectionNameInput.value = sectionToEdit.name;
-        editTeacherNameInput.value = sectionToEdit.teacher;
-
-        editYearRadios.forEach(radio => {
-            if (radio.value === sectionToEdit.year) {
-                radio.checked = true;
+            if (itemType === 'section') {
+                // 1. Close the confirmation modal
+                closeModal(deleteModal, deleteModalContent); 
+                
+                // 2. Show the loading overlay
+                showLoadingOverlay('Deleting section and associated data...'); 
+                
+                // 3. Submit the form for section deletion
+                const tempForm = document.createElement('form');
+                tempForm.method = 'POST';
+                tempForm.action = 'sections.php';
+                tempForm.innerHTML = `
+                    <input type="hidden" name="action" value="delete_section">
+                    <input type="hidden" name="section_id" value="${itemId}">
+                `;
+                
+                document.body.appendChild(tempForm);
+                tempForm.submit();
             } else {
-                radio.checked = false;
+                console.error("Item type mismatch in section-manage.js delete handler.");
+                // If student-manage.js is also present, it should handle 'student'
             }
         });
-
-        openModal(editModal, editModalContent);
     }
-    
-    openBtn.addEventListener('click', () => openModal(modal, modalContent));
-    closeBtn.addEventListener('click', () => closeModal(modal, modalContent));
-    closeSuccessModalBtn.addEventListener('click', () => closeModal(successModal, successModalContent));
-    closeEditModalBtn.addEventListener('click', () => closeModal(editModal, editModalContent)); 
-    
-    cancelDeleteBtn.addEventListener('click', () => closeModal(deleteModal, deleteModalContent));
-    confirmDeleteBtn.addEventListener('click', function() {
-        const sectionId = this.getAttribute('data-section-id');
-        if (sectionId) {
-            executeDeleteAction(sectionId);
-        }
-    });
 
 
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) { closeModal(modal, modalContent); }
-    });
-    successModal.addEventListener('click', (e) => {
-        if (e.target === successModal) { closeModal(successModal, successModalContent); }
-    });
-    editModal.addEventListener('click', (e) => { 
-        if (e.target === editModal) { closeModal(editModal, editModalContent); }
-    });
-    deleteModal.addEventListener('click', (e) => { 
-        if (e.target === deleteModal) { closeModal(deleteModal, deleteModalContent); }
-    });
-    
-    const style = document.createElement('style');
-    style.innerHTML = `
-    .custom-scroll::-webkit-scrollbar {
-        width: 6px;
-    }
-    .custom-scroll::-webkit-scrollbar-track {
-        background: #f8f9fb;
-        border-radius: 10px;
-    }
-    .custom-scroll::-webkit-scrollbar-thumb {
-        background: #D1D5DB;
-        border-radius: 10px;
-    }
-    .custom-scroll::-webkit-scrollbar-thumb:hover {
-        background: #9CA3AF;
-    }
-    `;
-    document.head.appendChild(style);
-
+    // --- Success Details Display Logic ---
     let detailsToShow = null;
-    let modalTitle = '';
-    let modalDescription = ''; 
-    
-    if (successDetails && successDetails.name) {
+    let modalTitle = 'Success';
+    let modalDescription = '';
+
+    // sectionsList is assumed to be defined globally in sections.php
+    // sectionToEdit is assumed to be defined globally in sections.php
+
+    if (typeof successDetails !== 'undefined' && successDetails && successDetails.name) {
         detailsToShow = successDetails;
         modalTitle = 'Section Added Successfully!';
-        modalDescription = 'The new section has been saved to the database.';
-    } 
-    else if (editSuccessDetails && editSuccessDetails.name) {
+        modalDescription = `${detailsToShow.name} (${detailsToShow.year}) was successfully created.`;
+    }
+    else if (typeof editSuccessDetails !== 'undefined' && editSuccessDetails && editSuccessDetails.name) {
         detailsToShow = editSuccessDetails;
         modalTitle = 'Section Updated Successfully!';
         modalDescription = 'The section details have been successfully updated.';
     }
-    else if (deleteSuccessDetails && deleteSuccessDetails.name) {
+    else if (typeof deleteSuccessDetails !== 'undefined' && deleteSuccessDetails && deleteSuccessDetails.name) {
         detailsToShow = deleteSuccessDetails;
         modalTitle = 'Section Deleted Successfully!';
         modalDescription = 'The section was permanently removed from the system.'; 
@@ -218,9 +218,16 @@ document.addEventListener('DOMContentLoaded', function() {
             successModalDescription.textContent = modalDescription; 
         }
 
-        document.getElementById('modalSectionName').textContent = detailsToShow.name;
-        document.getElementById('modalSectionYear').textContent = detailsToShow.year;
-        document.getElementById('modalTeacherName').textContent = detailsToShow.teacher;
+        // Assuming success_modal.php has these IDs
+        if (document.getElementById('modalSectionName')) {
+             document.getElementById('modalSectionName').textContent = detailsToShow.name || 'N/A';
+        }
+        if (document.getElementById('modalSectionYear')) {
+             document.getElementById('modalSectionYear').textContent = detailsToShow.year || 'N/A';
+        }
+        if (document.getElementById('modalTeacherName')) {
+             document.getElementById('modalTeacherName').textContent = detailsToShow.teacher || 'N/A';
+        }
         
         if (addSectionForm) {
             addSectionForm.reset(); 

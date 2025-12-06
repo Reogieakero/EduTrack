@@ -17,8 +17,20 @@ if (isset($_SESSION['add_success_details'])) {
     unset($_SESSION['add_success_details']);
 } 
 $edit_success_details = null; 
+if (isset($_SESSION['edit_success_details'])) {
+    $edit_success_details = $_SESSION['edit_success_details'];
+    unset($_SESSION['edit_success_details']);
+}
 $delete_success_details = null; 
+if (isset($_SESSION['delete_success_details'])) {
+    $delete_success_details = $_SESSION['delete_success_details'];
+    unset($_SESSION['delete_success_details']);
+}
 $student_to_edit = null; 
+if (isset($_SESSION['student_to_edit'])) {
+    $student_to_edit = $_SESSION['student_to_edit'];
+    unset($_SESSION['student_to_edit']);
+}
 
 // State variables
 $students = [];
@@ -30,7 +42,6 @@ $fetch_error = false;
 $selected_section_id = $_GET['section_id'] ?? 'all';
 
 // Fetch all sections for filter and add/edit forms
-// Assuming 'teacher' column exists in sections for the modal
 $sql_fetch_sections = "SELECT id, year, name, teacher FROM sections ORDER BY year ASC, name ASC";
 if ($stmt_sections = $conn->prepare($sql_fetch_sections)) {
     if ($stmt_sections->execute()) {
@@ -42,26 +53,101 @@ if ($stmt_sections = $conn->prepare($sql_fetch_sections)) {
     $stmt_sections->close();
 }
 
-// 4. Student Data Fetching
-// *** MODIFICATION START: Updated SQL query to include quarterly grades ***
-$sql_fetch = "
-    SELECT 
-        s.*, 
-        sec.year as section_year, 
-        sec.name as section_name,
-        g1.grade AS q1_grade,
-        g2.grade AS q2_grade,
-        g3.grade AS q3_grade,
-        g4.grade AS q4_grade
-    FROM students s 
-    JOIN sections sec ON s.section_id = sec.id
-    LEFT JOIN grades g1 ON s.id = g1.student_id AND s.section_id = g1.section_id AND g1.quarter = 'Q1'
-    LEFT JOIN grades g2 ON s.id = g2.student_id AND s.section_id = g2.section_id AND g2.quarter = 'Q2'
-    LEFT JOIN grades g3 ON s.id = g3.student_id AND s.section_id = g3.section_id AND g3.quarter = 'Q3'
-    LEFT JOIN grades g4 ON s.id = g4.student_id AND s.section_id = g4.section_id AND g4.quarter = 'Q4'
-";
-// *** MODIFICATION END ***
 
+// 5. POST Request Handling (Add/Delete Student)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    
+    // --- Handle Add Student ---
+    if ($_POST['action'] === 'add_student') {
+        $first_name = trim($_POST['first_name'] ?? '');
+        $last_name = trim($_POST['last_name'] ?? '');
+        $section_id = (int)($_POST['section_id'] ?? 0);
+        $date_of_birth = trim($_POST['date_of_birth'] ?? '');
+
+        // Basic validation
+        if (empty($first_name) || empty($last_name) || $section_id <= 0 || empty($date_of_birth)) {
+            $add_error = "All student fields are required.";
+        } else {
+            $sql = "INSERT INTO students (first_name, last_name, section_id, date_of_birth, enrollment_date) VALUES (?, ?, ?, ?, NOW())";
+            
+            if ($stmt = $conn->prepare($sql)) {
+                $stmt->bind_param("ssis", $param_first_name, $param_last_name, $param_section_id, $param_dob);
+                
+                $param_first_name = $first_name;
+                $param_last_name = $last_name;
+                $param_section_id = $section_id;
+                $param_dob = $date_of_birth;
+                
+                if ($stmt->execute()) {
+                    // Get section details for the success message
+                    $section_info = $sections_list[$section_id] ?? ['name' => 'N/A', 'year' => 'N/A', 'teacher' => 'N/A'];
+                    
+                    $_SESSION['add_success_details'] = [
+                        'name' => $first_name . ' ' . $last_name,
+                        'section_name' => $section_info['name'],
+                        'section_year' => $section_info['year'],
+                        'teacher_name' => $section_info['teacher']
+                    ];
+                    header("Location: students.php");
+                    exit;
+                } else {
+                    $add_error = "ERROR: Could not execute the insert statement. " . $stmt->error;
+                }
+                $stmt->close();
+            } else {
+                $add_error = "ERROR: Could not prepare the insert statement. " . $conn->error;
+            }
+        }
+    }
+    
+    // --- Handle Delete Student ---
+    if ($_POST['action'] === 'delete_student') {
+        $student_id = (int)($_POST['student_id'] ?? 0);
+        
+        if ($student_id > 0) {
+            // 1. Select student details for the success message
+            $sql_select = "SELECT s.first_name, s.last_name, sec.year, sec.name as section_name, sec.teacher FROM students s JOIN sections sec ON s.section_id = sec.id WHERE s.id = ?";
+            $deleted_details = null;
+
+            if ($stmt_select = $conn->prepare($sql_select)) {
+                $stmt_select->bind_param("i", $student_id);
+                $stmt_select->execute();
+                $result_select = $stmt_select->get_result();
+                $deleted_details = $result_select->fetch_assoc();
+                $stmt_select->close();
+            }
+
+            if ($deleted_details) {
+                // 2. Delete the student
+                $sql_delete = "DELETE FROM students WHERE id = ?";
+                if ($stmt_delete = $conn->prepare($sql_delete)) {
+                    $stmt_delete->bind_param("i", $student_id);
+                    if ($stmt_delete->execute()) {
+                        $_SESSION['delete_success_details'] = [
+                            'name' => $deleted_details['first_name'] . ' ' . $deleted_details['last_name'],
+                            'section_name' => $deleted_details['section_name'],
+                            'section_year' => $deleted_details['year'],
+                            'teacher_name' => $deleted_details['teacher']
+                        ];
+                        header("Location: students.php");
+                        exit;
+                    } else {
+                        $add_error = "ERROR: Could not delete student. " . $stmt_delete->error;
+                    }
+                    $stmt_delete->close();
+                } else {
+                    $add_error = "ERROR: Could not prepare delete statement. " . $conn->error;
+                }
+            } else {
+                $add_error = "ERROR: Student not found for deletion.";
+            }
+        }
+    }
+}
+
+
+// 4. Student Data Fetching (Re-run if no POST-redirect occurred)
+$sql_fetch = "SELECT s.*, sec.year as section_year, sec.name as section_name, sec.teacher as teacher_name FROM students s JOIN sections sec ON s.section_id = sec.id";
 $where_clause = '';
 $params = [];
 $types = '';
@@ -72,7 +158,6 @@ if ($selected_section_id !== 'all' && is_numeric($selected_section_id)) {
     $types .= 'i';
 }
 
-// *** MODIFICATION: Changed ORDER BY to sort by Section Year and Name first ***
 $sql_fetch .= $where_clause . " ORDER BY sec.year ASC, sec.name ASC, s.last_name ASC, s.first_name ASC";
 
 
@@ -98,51 +183,6 @@ if ($stmt = $conn->prepare($sql_fetch)) {
     $stmt->close();
 } else {
     $fetch_error = "ERROR: Could not prepare the student fetch statement. " . $conn->error;
-}
-
-
-// 5. POST Request Handling (Add Student)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_student') {
-    $first_name = trim($_POST['first_name'] ?? '');
-    $last_name = trim($_POST['last_name'] ?? '');
-    $section_id = (int)($_POST['section_id'] ?? 0);
-    $date_of_birth = trim($_POST['date_of_birth'] ?? '');
-
-    // Basic validation
-    if (empty($first_name) || empty($last_name) || $section_id <= 0 || empty($date_of_birth)) {
-        $add_error = "All student fields are required.";
-    } else {
-        // Assuming enrollment_date is set to the current timestamp in the database
-        $sql = "INSERT INTO students (first_name, last_name, section_id, date_of_birth, enrollment_date) VALUES (?, ?, ?, ?, NOW())";
-        
-        if ($stmt = $conn->prepare($sql)) {
-            $stmt->bind_param("ssis", $param_first_name, $param_last_name, $param_section_id, $param_dob);
-            
-            $param_first_name = $first_name;
-            $param_last_name = $last_name;
-            $param_section_id = $section_id;
-            $param_dob = $date_of_birth;
-            
-            if ($stmt->execute()) {
-                // Get section details for the success message
-                $section_info = $sections_list[$section_id] ?? ['name' => 'N/A', 'year' => 'N/A', 'teacher' => 'N/A'];
-                
-                $_SESSION['add_success_details'] = [
-                    'name' => $first_name . ' ' . $last_name,
-                    'section_name' => $section_info['name'],
-                    'section_year' => $section_info['year'],
-                    'teacher_name' => $section_info['teacher']
-                ];
-                header("Location: students.php");
-                exit;
-            } else {
-                $add_error = "ERROR: Could not execute the insert statement. " . $stmt->error;
-            }
-            $stmt->close();
-        } else {
-            $add_error = "ERROR: Could not prepare the insert statement. " . $conn->error;
-        }
-    }
 }
 
 
@@ -216,7 +256,7 @@ include '../components/sidebar.php';
                 <span>All Students (<?php echo count($students); ?>)</span>
             </h2>
 
-            <?php include '../components/section_filter.php'; ?>
+            <?php // Assuming section_filter.php exists ?>
             </div>
 
         <div class="bg-white rounded-xl shadow-lg overflow-x-auto">
@@ -227,17 +267,13 @@ include '../components/sidebar.php';
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Section / Year</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date of Birth</th>
-                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Q1</th>
-                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Q2</th>
-                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Q3</th>
-                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Q4</th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                 <?php if (empty($students)): ?>
                     <tr>
-                        <td colspan="9" class="px-6 py-12 text-center text-gray-500">No students found for this filter.</td>
+                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">No students found for this filter.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($students as $student): ?>
@@ -246,10 +282,6 @@ include '../components/sidebar.php';
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-primary-blue"><?php echo htmlspecialchars($student['last_name'] . ', ' . $student['first_name']); ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo htmlspecialchars($student['section_year'] . ' - ' . $student['section_name']); ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo date('M d, Y', strtotime($student['date_of_birth'])); ?></td>
-                            <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-700 text-center"><?php echo htmlspecialchars($student['q1_grade'] ?? '-'); ?></td>
-                            <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-700 text-center"><?php echo htmlspecialchars($student['q2_grade'] ?? '-'); ?></td>
-                            <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-700 text-center"><?php echo htmlspecialchars($student['q3_grade'] ?? '-'); ?></td>
-                            <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-700 text-center"><?php echo htmlspecialchars($student['q4_grade'] ?? '-'); ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                                 <button onclick="initiateEditAction(<?php echo $student['id']; ?>)" class="text-primary-blue hover:text-blue-700 transition duration-150 p-1 rounded-md">
                                     <i data-lucide="square-pen" class="w-5 h-5"></i>
@@ -275,9 +307,9 @@ include '../components/delete_confirmation_modal.php';
 
 
 $success_json = json_encode($add_success_details);
-$edit_success_json = json_encode($edit_success_details); // Pass null placeholders
-$delete_success_json = json_encode($delete_success_details); // Pass null placeholders
-$edit_data_json = json_encode($student_to_edit); // Pass null placeholder
+$edit_success_json = json_encode($edit_success_details);
+$delete_success_json = json_encode($delete_success_details);
+$edit_data_json = json_encode($student_to_edit);
 
 // Pass section list to be used by the modal component
 $sections_list_json = json_encode($sections_list);
@@ -289,7 +321,6 @@ echo "<script>const deleteSuccessDetails = {$delete_success_json};</script>";
 echo "<script>const studentToEdit = {$edit_data_json};</script>";
 echo "<script>const sectionsList = {$sections_list_json};</script>";
 
-// Correct path to the new JS file
 ?>
 <script src= "../js/student-manage.js"></script>
 </body>
