@@ -22,7 +22,11 @@
                     <label for="edit_last_name" class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
                     <input type="text" id="edit_last_name" name="last_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue transition duration-150 shadow-sm" placeholder="e.g., Doe">
                 </div>
-
+                
+                <div>
+                    <label for="edit_middle_initial" class="block text-sm font-medium text-gray-700 mb-1">Middle Initial (Optional)</label>
+                    <input type="text" id="edit_middle_initial" name="middle_initial" maxlength="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue transition duration-150 shadow-sm" placeholder="e.g., A">
+                </div>
                 <div>
                     <label for="edit_date_of_birth" class="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
                     <div class="relative">

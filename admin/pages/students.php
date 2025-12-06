@@ -1,16 +1,13 @@
 <?php
 session_start();
 
-// 1. Authentication Check
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     header("Location: login.html");
     exit;
 }
 
-// 2. Database Connection (Path: EDUTRACK/admin/pages/ -> EDUTRACK/config/)
 require_once '../../config/database.php';
 
-// Success/Error Message Handling (Similar to sections.php)
 $add_success_details = null;
 if (isset($_SESSION['add_success_details'])) {
     $add_success_details = $_SESSION['add_success_details'];
@@ -26,30 +23,26 @@ if (isset($_SESSION['delete_success_details'])) {
     $delete_success_details = $_SESSION['delete_success_details'];
     unset($_SESSION['delete_success_details']);
 }
-// Variable to hold student data for pre-filling the edit modal
 $student_to_edit = null; 
 if (isset($_SESSION['student_to_edit'])) {
     $student_to_edit = $_SESSION['student_to_edit'];
     unset($_SESSION['student_to_edit']);
 }
 
-// State variables
 $students = [];
 $sections_list = []; 
+$grades_by_student = []; 
 $add_error = false;
 $fetch_error = false;
 
-// 3. Filtering and Selection
-// This variable MUST be defined for section_filter.php to work correctly.
 $selected_section_id = $_GET['section_id'] ?? 'all';
+$search_term = trim($_GET['search'] ?? '');
 
-// Fetch all sections for filter and add/edit forms
 $sql_fetch_sections = "SELECT id, year, name, teacher FROM sections ORDER BY year ASC, name ASC";
 if ($stmt_sections = $conn->prepare($sql_fetch_sections)) {
     if ($stmt_sections->execute()) {
         $result_sections = $stmt_sections->get_result();
         while ($row = $result_sections->fetch_assoc()) {
-            // Store section data using ID as key
             $sections_list[$row['id']] = $row;
         }
     }
@@ -57,36 +50,38 @@ if ($stmt_sections = $conn->prepare($sql_fetch_sections)) {
 }
 
 
-// 5. POST Request Handling (Add/Delete/Edit Student)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     
-    // --- Handle Add Student ---
     if ($_POST['action'] === 'add_student') {
         $first_name = trim($_POST['first_name'] ?? '');
         $last_name = trim($_POST['last_name'] ?? '');
+        $middle_initial = trim($_POST['middle_initial'] ?? '');
         $section_id = (int)($_POST['section_id'] ?? 0);
         $date_of_birth = trim($_POST['date_of_birth'] ?? '');
 
-        // Basic validation
         if (empty($first_name) || empty($last_name) || $section_id <= 0 || empty($date_of_birth)) {
-            $add_error = "All student fields are required.";
+            $add_error = "All required student fields are necessary.";
         } else {
-            $sql = "INSERT INTO students (first_name, last_name, section_id, date_of_birth, enrollment_date) VALUES (?, ?, ?, ?, NOW())";
+            $middle_initial = empty($middle_initial) ? null : strtoupper(substr($middle_initial, 0, 1));
+
+            $sql = "INSERT INTO students (first_name, last_name, middle_initial, section_id, date_of_birth, enrollment_date) VALUES (?, ?, ?, ?, ?, NOW())";
             
             if ($stmt = $conn->prepare($sql)) {
-                $stmt->bind_param("ssis", $param_first_name, $param_last_name, $param_section_id, $param_dob);
+                $stmt->bind_param("sssis", $param_first_name, $param_last_name, $param_middle_initial, $param_section_id, $param_dob);
                 
                 $param_first_name = $first_name;
                 $param_last_name = $last_name;
+                $param_middle_initial = $middle_initial;
                 $param_section_id = $section_id;
                 $param_dob = $date_of_birth;
                 
                 if ($stmt->execute()) {
-                    // Get section details for the success message
                     $section_info = $sections_list[$section_id] ?? ['name' => 'N/A', 'year' => 'N/A', 'teacher' => 'N/A'];
                     
+                    $full_name_display = $last_name . ', ' . $first_name . ($middle_initial ? ' ' . $middle_initial . '.' : '');
+                    
                     $_SESSION['add_success_details'] = [
-                        'name' => $first_name . ' ' . $last_name,
+                        'name' => $full_name_display,
                         'section_name' => $section_info['name'],
                         'section_year' => $section_info['year'],
                         'teacher_name' => $section_info['teacher']
@@ -103,13 +98,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
     
-    // --- Handle Delete Student ---
     if ($_POST['action'] === 'delete_student') {
         $student_id = (int)($_POST['student_id'] ?? 0);
         
         if ($student_id > 0) {
-            // 1. Select student details for the success message
-            $sql_select = "SELECT s.first_name, s.last_name, sec.year, sec.name as section_name, sec.teacher FROM students s JOIN sections sec ON s.section_id = sec.id WHERE s.id = ?";
+            $sql_select = "SELECT s.first_name, s.last_name, s.middle_initial, sec.year, sec.name as section_name, sec.teacher FROM students s JOIN sections sec ON s.section_id = sec.id WHERE s.id = ?";
             $deleted_details = null;
 
             if ($stmt_select = $conn->prepare($sql_select)) {
@@ -121,13 +114,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
 
             if ($deleted_details) {
-                // 2. Delete the student
                 $sql_delete = "DELETE FROM students WHERE id = ?";
                 if ($stmt_delete = $conn->prepare($sql_delete)) {
                     $stmt_delete->bind_param("i", $student_id);
                     if ($stmt_delete->execute()) {
+                        
+                        $mi = $deleted_details['middle_initial'];
+                        $full_name_display = $deleted_details['last_name'] . ', ' . $deleted_details['first_name'] . ($mi ? ' ' . $mi . '.' : '');
+
                         $_SESSION['delete_success_details'] = [
-                            'name' => $deleted_details['first_name'] . ' ' . $deleted_details['last_name'],
+                            'name' => $full_name_display,
                             'section_name' => $deleted_details['section_name'],
                             'section_year' => $deleted_details['year'],
                             'teacher_name' => $deleted_details['teacher']
@@ -147,13 +143,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
     
-    // --- Handle Fetch Edit Data ---
     if ($_POST['action'] === 'fetch_edit_data') {
         $student_id = (int)($_POST['student_id'] ?? 0);
         
         if ($student_id > 0) {
-            // Select all necessary fields for the edit form
-            $sql_fetch_student = "SELECT id, first_name, last_name, section_id, date_of_birth FROM students WHERE id = ?";
+            $sql_fetch_student = "SELECT id, first_name, last_name, middle_initial, section_id, date_of_birth FROM students WHERE id = ?";
             
             if ($stmt_fetch = $conn->prepare($sql_fetch_student)) {
                 $stmt_fetch->bind_param("i", $student_id);
@@ -163,9 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $stmt_fetch->close();
                     
                     if ($student_data) {
-                        // Store student data in session to be picked up by JS on redirect
                         $_SESSION['student_to_edit'] = $student_data;
-                        // Redirect back to students.php to render the modal with pre-filled data
                         header("Location: students.php");
                         exit;
                     } else {
@@ -180,35 +172,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // --- Handle Edit Student Submission ---
     if ($_POST['action'] === 'edit_student') {
         $student_id = (int)($_POST['student_id'] ?? 0);
         $first_name = trim($_POST['first_name'] ?? '');
         $last_name = trim($_POST['last_name'] ?? '');
+        $middle_initial = trim($_POST['middle_initial'] ?? '');
         $section_id = (int)($_POST['section_id'] ?? 0);
         $date_of_birth = trim($_POST['date_of_birth'] ?? '');
 
-        // Basic validation
         if ($student_id <= 0 || empty($first_name) || empty($last_name) || $section_id <= 0 || empty($date_of_birth)) {
-            $add_error = "All student fields and ID are required for update.";
+            $add_error = "All required student fields and ID are required for update.";
         } else {
-            $sql = "UPDATE students SET first_name = ?, last_name = ?, section_id = ?, date_of_birth = ? WHERE id = ?";
+            $middle_initial = empty($middle_initial) ? null : strtoupper(substr($middle_initial, 0, 1));
+            
+            $sql = "UPDATE students SET first_name = ?, last_name = ?, middle_initial = ?, section_id = ?, date_of_birth = ? WHERE id = ?";
             
             if ($stmt = $conn->prepare($sql)) {
-                $stmt->bind_param("ssisi", $param_first_name, $param_last_name, $param_section_id, $param_dob, $param_id);
+                $stmt->bind_param("sssisii", $param_first_name, $param_last_name, $param_middle_initial, $param_section_id, $param_dob, $param_id);
                 
                 $param_first_name = $first_name;
                 $param_last_name = $last_name;
+                $param_middle_initial = $middle_initial;
                 $param_section_id = $section_id;
                 $param_dob = $date_of_birth;
                 $param_id = $student_id;
                 
                 if ($stmt->execute()) {
-                    // Get section details for the success message
                     $section_info = $sections_list[$section_id] ?? ['name' => 'N/A', 'year' => 'N/A', 'teacher' => 'N/A'];
                     
+                    $full_name_display = $last_name . ', ' . $first_name . ($middle_initial ? ' ' . $middle_initial . '.' : '');
+
                     $_SESSION['edit_success_details'] = [
-                        'name' => $first_name . ' ' . $last_name,
+                        'name' => $full_name_display,
                         'section_name' => $section_info['name'],
                         'section_year' => $section_info['year'],
                         'teacher_name' => $section_info['teacher']
@@ -227,19 +222,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 
-// 4. Student Data Fetching (Re-run if no POST-redirect occurred)
 $sql_fetch = "SELECT s.*, sec.year as section_year, sec.name as section_name, sec.teacher as teacher_name FROM students s JOIN sections sec ON s.section_id = sec.id";
-$where_clause = '';
+$where_clauses = [];
 $params = [];
 $types = '';
 
 if ($selected_section_id !== 'all' && is_numeric($selected_section_id)) {
-    $where_clause = " WHERE s.section_id = ?";
+    $where_clauses[] = "s.section_id = ?";
     $params[] = $selected_section_id;
     $types .= 'i';
 }
 
-$sql_fetch .= $where_clause . " ORDER BY sec.year ASC, sec.name ASC, s.last_name ASC, s.first_name ASC";
+if (!empty($search_term)) {
+    $search_pattern = '%' . $search_term . '%';
+    $where_clauses[] = "(s.first_name LIKE ? OR s.last_name LIKE ? OR CONCAT(s.first_name, ' ', s.last_name) LIKE ? OR CONCAT(s.last_name, ' ', s.first_name) LIKE ?)";
+    $params[] = $search_pattern;
+    $params[] = $search_pattern;
+    $params[] = $search_pattern;
+    $params[] = $search_pattern;
+    $types .= 'ssss';
+}
+
+if (!empty($where_clauses)) {
+    $sql_fetch .= " WHERE " . implode(' AND ', $where_clauses);
+}
+
+$sql_fetch .= " ORDER BY sec.year ASC, sec.name ASC, s.last_name ASC, s.first_name ASC";
 
 
 if ($stmt = $conn->prepare($sql_fetch)) {
@@ -267,6 +275,51 @@ if ($stmt = $conn->prepare($sql_fetch)) {
 }
 
 
+if (!empty($students)) {
+    $student_ids = array_column($students, 'id');
+    $in_clause = implode(',', array_fill(0, count($student_ids), '?'));
+    
+    $sql_fetch_grades = "SELECT student_id, quarter, grade FROM grades WHERE student_id IN ($in_clause)";
+
+    $types_grades = str_repeat('i', count($student_ids));
+
+    if ($stmt_grades = $conn->prepare($sql_fetch_grades)) {
+        $bind_names = [$types_grades];
+        foreach ($student_ids as &$id) {
+            $bind_names[] = &$id;
+        }
+        call_user_func_array([$stmt_grades, 'bind_param'], $bind_names);
+
+        if ($stmt_grades->execute()) {
+            $result_grades = $stmt_grades->get_result();
+            
+            while ($row = $result_grades->fetch_assoc()) {
+                $student_id = $row['student_id'];
+                $quarter = strtoupper($row['quarter']); 
+
+                if (!isset($grades_by_student[$student_id])) {
+                    $grades_by_student[$student_id] = [
+                        'Q1' => null, 
+                        'Q2' => null, 
+                        'Q3' => null, 
+                        'Q4' => null
+                    ];
+                }
+                
+                if (in_array($quarter, ['Q1', 'Q2', 'Q3', 'Q4'])) {
+                    $grades_by_student[$student_id][$quarter] = number_format($row['grade'], 0); 
+                }
+            }
+        } else {
+            error_log("Grade Fetch Error: " . $stmt_grades->error);
+        }
+        $stmt_grades->close();
+    } else {
+         error_log("Grade Prepare Error: " . $conn->error);
+    }
+}
+
+
 if (isset($conn)) {
     $conn->close();
 }
@@ -281,7 +334,6 @@ if (isset($conn)) {
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script>
-// Use the same Tailwind config as sections.php
 tailwind.config = {
     theme: {
         extend: {
@@ -304,7 +356,6 @@ tailwind.config = {
 <body class="bg-page-bg min-h-screen flex">
 
 <?php 
-// Include existing components
 include '../components/loading_overlay.php'; 
 include '../components/sidebar.php'; 
 ?>
@@ -331,13 +382,18 @@ include '../components/sidebar.php';
 
 
     <div class="lg:col-span-3">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-            <h2 class="text-3xl font-bold text-gray-800 flex items-center space-x-2 mb-4 sm:mb-0">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 space-y-4 md:space-y-0 md:space-x-4">
+            <h2 class="text-3xl font-bold text-gray-800 flex items-center space-x-2">
                 <i data-lucide="users" class="w-7 h-7 text-gray-600"></i>
                 <span>All Students (<?php echo count($students); ?>)</span>
             </h2>
 
-            <?php include '../components/section_filter.php'; ?>
+            <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
+                <?php 
+                include '../components/search_bar.php'; 
+                include '../components/section_filter.php'; 
+                ?>
+            </div>
         </div>
 
         <div class="bg-white rounded-xl shadow-lg overflow-x-auto">
@@ -345,7 +401,13 @@ include '../components/sidebar.php';
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student ID</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">First Name</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">M.I.</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Q1</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Q2</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Q3</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Q4</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Section / Year</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date of Birth</th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -354,13 +416,54 @@ include '../components/sidebar.php';
                 <tbody class="bg-white divide-y divide-gray-200">
                 <?php if (empty($students)): ?>
                     <tr>
-                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">No students found for this filter.</td>
+                        <td colspan="11" class="px-6 py-12 text-center text-gray-500">
+                            <?php if (!empty($search_term)): ?>
+                                No students found matching "<?php echo htmlspecialchars($search_term); ?>".
+                            <?php else: ?>
+                                No students found for this filter.
+                            <?php endif; ?>
+                        </td>
                     </tr>
                 <?php else: ?>
+                    <?php 
+                    // FIX: Wrap the function definition in a check to prevent redeclaration
+                    if (!function_exists('get_grade_class')) {
+                        function get_grade_class($grade) {
+                            if ($grade === '-' || $grade === null) return 'text-gray-500';
+                            return ((int)$grade >= 75) ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold';
+                        }
+                    }
+                    ?>
                     <?php foreach ($students as $student): ?>
+                        <?php
+                            $student_grades = $grades_by_student[$student['id']] ?? [
+                                'Q1' => '-', 
+                                'Q2' => '-', 
+                                'Q3' => '-', 
+                                'Q4' => '-'
+                            ];
+
+                            $q1_grade = $student_grades['Q1'] ?? '-';
+                            $q2_grade = $student_grades['Q2'] ?? '-';
+                            $q3_grade = $student_grades['Q3'] ?? '-';
+                            $q4_grade = $student_grades['Q4'] ?? '-';
+                            
+                            
+                            $q1_class = get_grade_class($q1_grade);
+                            $q2_class = get_grade_class($q2_grade);
+                            $q3_class = get_grade_class($q3_grade);
+                            $q4_class = get_grade_class($q4_grade);
+                        ?>
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold"><?php echo htmlspecialchars($student['id']); ?></td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-primary-blue"><?php echo htmlspecialchars($student['last_name'] . ', ' . $student['first_name']); ?></td>
+                            
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium"><?php echo htmlspecialchars($student['last_name']); ?></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-primary-blue"><?php echo htmlspecialchars($student['first_name']); ?></td>
+                            <td class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-500"><?php echo htmlspecialchars($student['middle_initial'] ?? '-'); ?></td>
+                            <td class="px-3 py-4 whitespace-nowrap text-sm text-center <?php echo $q1_class; ?>"><?php echo htmlspecialchars($q1_grade); ?></td>
+                            <td class="px-3 py-4 whitespace-nowrap text-sm text-center <?php echo $q2_class; ?>"><?php echo htmlspecialchars($q2_grade); ?></td>
+                            <td class="px-3 py-4 whitespace-nowrap text-sm text-center <?php echo $q3_class; ?>"><?php echo htmlspecialchars($q3_grade); ?></td>
+                            <td class="px-3 py-4 whitespace-nowrap text-sm text-center <?php echo $q4_class; ?>"><?php echo htmlspecialchars($q4_grade); ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo htmlspecialchars($student['section_year'] . ' - ' . $student['section_name']); ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo date('M d, Y', strtotime($student['date_of_birth'])); ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
@@ -381,9 +484,10 @@ include '../components/sidebar.php';
 </main>
 
 <?php 
-// Include necessary modal components
+include '../components/loading_overlay.php'; 
+include '../components/sidebar.php'; 
 include '../components/add_student_modal.php'; 
-include '../components/edit_student_modal.php'; // <-- NEW
+include '../components/edit_student_modal.php'; 
 include '../components/success_modal.php'; 
 include '../components/delete_confirmation_modal.php'; 
 
@@ -393,7 +497,6 @@ $edit_success_json = json_encode($edit_success_details);
 $delete_success_json = json_encode($delete_success_details);
 $edit_data_json = json_encode($student_to_edit);
 
-// Pass section list to be used by the modal component
 $sections_list_json = json_encode($sections_list);
 
 

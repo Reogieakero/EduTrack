@@ -28,7 +28,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const successModalDescription = document.getElementById('success-modal-description');
     
-    // --- Delete Modal (Generic) ---
     const deleteModal = document.getElementById('deleteConfirmationModal');
     const deleteModalContent = document.getElementById('deleteModalContent');
     const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
@@ -36,7 +35,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const deleteItemNameSpan = document.getElementById('deleteItemName');
     const deleteItemTypeSpan = document.getElementById('deleteItemType');
     
-    // --- Edit Modal Declarations (NEW) ---
     const editModal = document.getElementById('editStudentModal');
     const editModalContent = document.getElementById('editModalContent');
     const closeEditModalBtn = document.getElementById('closeEditModalBtn');
@@ -46,7 +44,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const updateIcon = document.getElementById('updateIcon');
     const updateText = document.getElementById('updateText');
     const updateLoadingSpinner = document.getElementById('updateLoadingSpinner');
-
+    
+    const searchInput = document.getElementById('search-input'); 
+    const searchForm = document.getElementById('searchForm'); 
+    let searchTimeout = null; 
 
     const openModal = (targetModal, targetContent) => {
         targetModal.classList.remove('hidden');
@@ -84,7 +85,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // --- Edit Form Submission Handler (NEW) ---
     if (editStudentForm) {
         editStudentForm.addEventListener('submit', function(event) {
             if (editStudentForm.checkValidity()) {
@@ -95,7 +95,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateStudentBtn.classList.remove('hover:bg-blue-700');
                 updateStudentBtn.classList.add('opacity-70', 'cursor-not-allowed');
                 
-                // Show loading overlay on submission
                 const loadingOverlay = document.getElementById('loadingOverlay');
                 if (loadingOverlay) {
                     if (loadingMessageText) {
@@ -110,12 +109,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Event Listeners ---
     if (openBtn) openBtn.addEventListener('click', () => openModal(modal, modalContent));
     if (closeBtn) closeBtn.addEventListener('click', () => closeModal(modal, modalContent));
     if (closeSuccessModalBtn) closeSuccessModalBtn.addEventListener('click', () => closeModal(successModal, successModalContent));
     if (cancelDeleteBtn) cancelDeleteBtn.addEventListener('click', () => closeModal(deleteModal, deleteModalContent)); 
-    if (closeEditModalBtn) closeEditModalBtn.addEventListener('click', () => closeModal(editModal, editModalContent)); // NEW
+    if (closeEditModalBtn) closeEditModalBtn.addEventListener('click', () => closeModal(editModal, editModalContent)); 
 
     if (modal) modal.addEventListener('click', (e) => {
         if (e.target === modal) { closeModal(modal, modalContent); }
@@ -126,11 +124,29 @@ document.addEventListener('DOMContentLoaded', function() {
     if (deleteModal) deleteModal.addEventListener('click', (e) => {
         if (e.target === deleteModal) { closeModal(deleteModal, deleteModalContent); }
     });
-    if (editModal) editModal.addEventListener('click', (e) => { // NEW
+    if (editModal) editModal.addEventListener('click', (e) => { 
         if (e.target === editModal) { closeModal(editModal, editModalContent); }
     });
     
-    // --- Delete Confirmation (Generic Modal Opener) ---
+    if (searchInput && searchForm) {
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimeout); 
+            searchTimeout = setTimeout(() => {
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                if (loadingOverlay) {
+                    if (loadingMessageText) {
+                        loadingMessageText.textContent = 'Searching Students...';
+                    }
+                    loadingOverlay.classList.remove('hidden');
+                    setTimeout(() => {
+                        loadingOverlay.classList.remove('opacity-0');
+                    }, 10);
+                }
+                searchForm.submit();
+            }, 300);
+        });
+    }
+
     window.confirmDeleteAction = function(itemId, itemName) {
         const itemType = 'student'; 
         
@@ -143,14 +159,12 @@ document.addEventListener('DOMContentLoaded', function() {
         openModal(deleteModal, deleteModalContent);
     };
 
-    // --- Generic Delete Confirmation POST Handler ---
     if (confirmDeleteBtn) {
         confirmDeleteBtn.addEventListener('click', function() {
             const itemId = this.getAttribute('data-item-id');
             const itemType = this.getAttribute('data-item-type');
             
             if (itemType === 'student') {
-                // Show the loading overlay before submitting the form
                 const loadingOverlay = document.getElementById('loadingOverlay');
                 if (loadingOverlay) {
                     if (loadingMessageText) {
@@ -163,10 +177,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     }, 10);
                 }
                 
-                // Close the confirmation modal
                 closeModal(deleteModal, deleteModalContent); 
 
-                // Submit the form for student deletion
                 const tempForm = document.createElement('form');
                 tempForm.method = 'POST';
                 tempForm.action = 'students.php'; 
@@ -183,9 +195,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Initiate Edit Action (NEW) ---
     window.initiateEditAction = function(studentId) {
-        // Show the loading overlay before submitting the form to fetch data
         const loadingOverlay = document.getElementById('loadingOverlay');
         if (loadingOverlay) {
             if (loadingMessageText) {
@@ -197,7 +207,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 10);
         }
         
-        // Submit a temporary form to students.php to fetch the student's data and redirect
         const tempForm = document.createElement('form');
         tempForm.method = 'POST';
         tempForm.action = 'students.php'; 
@@ -220,7 +229,6 @@ document.addEventListener('DOMContentLoaded', function() {
         modalTitle = 'Student Enrolled Successfully!';
         modalDescription = `${detailsToShow.name} was successfully enrolled into ${detailsToShow.section_year} - ${detailsToShow.section_name}.`;
     } 
-    // --- Edit Success Details (NEW) ---
     else if (typeof editSuccessDetails !== 'undefined' && editSuccessDetails && editSuccessDetails.name) {
         detailsToShow = editSuccessDetails;
         modalTitle = 'Student Updated Successfully!';
@@ -267,27 +275,21 @@ document.addEventListener('DOMContentLoaded', function() {
         openModal(successModal, successModalContent);
     }
     
-    // --- Handle Student To Edit (NEW) ---
     if (typeof studentToEdit !== 'undefined' && studentToEdit && studentToEdit.id) {
-        // Wait 500ms for visual consistency with section editing before showing the modal
         setTimeout(() => {
-            // Fill the form fields
             document.getElementById('edit_student_id').value = studentToEdit.id;
             document.getElementById('edit_first_name').value = studentToEdit.first_name;
             document.getElementById('edit_last_name').value = studentToEdit.last_name;
+            document.getElementById('edit_middle_initial').value = studentToEdit.middle_initial || ''; 
             document.getElementById('edit_date_of_birth').value = studentToEdit.date_of_birth;
             
             const currentSectionId = studentToEdit.section_id.toString();
             
-            // Find the selected section list item
             const selectedOption = document.querySelector(`#edit-section-options-list li[data-value="${currentSectionId}"]`);
             
-            // Check if handleSectionSelect function is globally available (it should be from edit_student_modal.php)
             if (selectedOption && typeof handleSectionSelect === 'function') {
-                // Use the generalized handleSectionSelect function to set the dropdown state
                 handleSectionSelect(selectedOption, 'edit');
             } else {
-                 // Fallback for setting input value if function is not available
                  document.getElementById('edit_section_id').value = currentSectionId;
                  const sectionInfo = sectionsList[currentSectionId];
                  if (sectionInfo) {
@@ -298,7 +300,6 @@ document.addEventListener('DOMContentLoaded', function() {
                  }
             }
 
-            // Hide loading overlay
             const loadingOverlay = document.getElementById('loadingOverlay');
             if (loadingOverlay) {
                 loadingOverlay.classList.add('opacity-0');
@@ -308,6 +309,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             openModal(editModal, editModalContent);
-        }, 500); // <-- Consistent 500ms delay added here
+        }, 500); 
     }
 });

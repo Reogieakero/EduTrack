@@ -25,6 +25,10 @@
                 </div>
 
                 <div>
+                    <label for="modal_middle_initial" class="block text-sm font-medium text-gray-700 mb-1">Middle Initial (Optional)</label>
+                    <input type="text" id="modal_middle_initial" name="middle_initial" maxlength="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-green focus:border-primary-green transition duration-150 shadow-sm" placeholder="e.g., A">
+                </div>
+                <div>
                     <label for="modal_date_of_birth" class="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
                     <div class="relative">
                         <input type="date" id="modal_date_of_birth" name="date_of_birth" required 
@@ -179,7 +183,6 @@
     top: 0;
     right: -10px;
 }
-/* For Firefox */
 .custom-date-input {
     -moz-appearance: none; 
     appearance: none;
